@@ -47,14 +47,19 @@
     // ---- Things to save ----
     // group: family must all be saved; the rest are worth points.
     // speed: how fast you walk while carrying it (1 = normal, 0.45 = very slow).
+    // alive: the water at Red doesn't ruin it (you can still save it). walks: it follows you
+    // instead of being carried in your hands.
     var ITEM_TYPES = {
-        lola:       { name: 'Lola',           group: 'family',    points: 100, speed: 0.6 },
-        lolo:       { name: 'Lolo',           group: 'family',    points: 100, speed: 0.6 },
-        bunso:      { name: 'Bunso',          group: 'family',    points: 100, speed: 0.9 },
-        nene:       { name: 'Nene',           group: 'family',    points: 100, speed: 0.9 },
-        dog:        { name: 'Bantay the dog', group: 'pet',       points: 50,  speed: 0.9 },
-        cat:        { name: 'Muning the cat', group: 'pet',       points: 50,  speed: 1 },
+        lola:       { name: 'Lola',           group: 'family',    points: 100, speed: 0.6,  alive: true, walks: true },
+        lolo:       { name: 'Lolo',           group: 'family',    points: 100, speed: 0.6,  alive: true, walks: true },
+        bunso:      { name: 'Bunso',          group: 'family',    points: 100, speed: 0.9,  alive: true, walks: true },
+        nene:       { name: 'Nene',           group: 'family',    points: 100, speed: 0.9,  alive: true, walks: true },
+        dog:        { name: 'Bantay the dog', group: 'pet',       points: 50,  speed: 0.9,  alive: true, walks: true },
+        cat:        { name: 'Muning the cat', group: 'pet',       points: 50,  speed: 1,    alive: true, walks: true },
+        chicken:    { name: 'Manok',          group: 'pet',       points: 20,  speed: 1,    alive: true, walks: true },
+        bird:       { name: 'Birdcage',       group: 'pet',       points: 40,  speed: 0.95, alive: true },
         documents:  { name: 'Documents',      group: 'important', points: 40,  speed: 1 },
+        laptop:     { name: 'School laptop',  group: 'important', points: 40,  speed: 1 },
         rice:       { name: 'Sack of rice',   group: 'supplies',  points: 30,  speed: 0.7 },
         water:      { name: 'Drinking water', group: 'supplies',  points: 30,  speed: 0.8 },
         flashlight: { name: 'Flashlight',     group: 'supplies',  points: 20,  speed: 1 },
@@ -66,11 +71,11 @@
 
     // Family and pets walk with you (drawn behind you); objects are held in front
     function isAlive(def) {
-        return def.group === 'family' || def.group === 'pet';
+        return def.alive === true;
     }
 
     function weightWord(def) {
-        if (isAlive(def)) {
+        if (def.walks) {
             return def.speed <= 0.7 ? 'walks slowly' : 'keeps up with you';
         }
         if (def.speed <= 0.5) { return 'very heavy'; }
@@ -80,9 +85,14 @@
     }
 
     // Map characters you can't walk through
-    var SOLID = { '#': true, 'w': true, 'F': true, 'b': true, 'k': true, 't': true, 's': true };
+    var SOLID = { '#': true, 'w': true, 'F': true, 'b': true, 'k': true, 't': true, 's': true,
+                  'f': true, 'R': true, 'T': true };
     // Furniture: drawn as one object per connected group of the same character
-    var FURNITURE = { 'b': true, 'k': true, 't': true, 's': true, 'S': true, 'F': true };
+    var FURNITURE = { 'b': true, 'k': true, 't': true, 's': true, 'S': true, 'F': true, 'R': true, 'T': true };
+    // Floors you walk on (other tiles get the floor of their neighbors drawn underneath)
+    var FLOORS = { '.': true, ',': true, 'g': true, 'c': true };
+    // The flood covers every tile except these (walls, the stairs, and things standing above the water)
+    var DRY = { '#': true, 'w': true, 'F': true, 'S': true, 'f': true, 'R': true, 'T': true };
 
     // ---- Colors ----
     var C = {
@@ -118,6 +128,8 @@
     var warnBadge = document.getElementById('warn-badge');
     var hudTimer = document.getElementById('hud-timer');
     var endScreen = document.getElementById('end-screen');
+    var houseList = document.getElementById('house-list');
+    var nextBtn = document.getElementById('next-btn');
 
     var reducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
     var touchScreen = window.matchMedia ? window.matchMedia('(pointer: coarse)') : { matches: false };
@@ -207,8 +219,7 @@
         waterTiles = [];
         for (r = 0; r < rows; r++) {
             for (c = 0; c < cols; c++) {
-                var ch = tileAt(c, r);
-                if (ch !== '#' && ch !== 'w' && ch !== 'F' && ch !== 'S') {
+                if (!DRY[tileAt(c, r)]) {
                     waterTiles.push([c, r]);
                 }
             }
@@ -252,24 +263,34 @@
 
         var row, col, ch;
 
-        // 1. Floors (also under furniture, stairs and doors)
+        // 1. Floors (also under furniture, stairs, doors and fences)
         for (row = 0; row < rows; row++) {
             for (col = 0; col < cols; col++) {
                 ch = tileAt(col, row);
-                if (ch === ',' || (ch === 'k')) {
+                if (ch === '#' || ch === 'w') {
+                    continue;
+                }
+                var floor = FLOORS[ch] ? ch : floorUnder(col, row);
+                if (floor === ',') {
                     drawTileFloor(g, col, row);
-                } else if (ch !== '#' && ch !== 'w') {
+                } else if (floor === 'g') {
+                    drawGrass(g, col, row);
+                } else if (floor === 'c') {
+                    drawConcrete(g, col, row);
+                } else {
                     drawWoodFloor(g, col, row);
                 }
             }
         }
 
-        // 2. Walls and windows
+        // 2. Walls, windows and fences
         for (row = 0; row < rows; row++) {
             for (col = 0; col < cols; col++) {
                 ch = tileAt(col, row);
                 if (ch === '#' || ch === 'w') {
                     drawWall(g, col, row, ch === 'w');
+                } else if (ch === 'f') {
+                    drawFence(g, col, row);
                 }
             }
         }
@@ -303,6 +324,71 @@
         }
     }
 
+    // Which floor goes under a bed, door, ladder, etc.? The most common floor around it.
+    function floorUnder(col, row) {
+        var count = {};
+        var best = '.';
+        var bestN = 0;
+        for (var dr = -1; dr <= 1; dr++) {
+            for (var dc = -1; dc <= 1; dc++) {
+                var ch = tileAt(col + dc, row + dr);
+                if (FLOORS[ch]) {
+                    count[ch] = (count[ch] || 0) + 1;
+                    if (count[ch] > bestN) {
+                        bestN = count[ch];
+                        best = ch;
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    function drawGrass(g, col, row) {
+        var x = col * TILE;
+        var y = row * TILE;
+        g.fillStyle = '#6da64e';
+        g.fillRect(x, y, TILE, TILE);
+        // little tufts, in a pattern that looks random but is the same every time
+        g.fillStyle = '#5a9140';
+        for (var i = 0; i < 4; i++) {
+            var tx = x + ((col * 13 + row * 7 + i * 11) % 26) + 3;
+            var ty = y + ((col * 5 + row * 17 + i * 9) % 24) + 4;
+            g.fillRect(tx, ty, 2, 4);
+            g.fillRect(tx + 3, ty + 1, 2, 3);
+        }
+    }
+
+    function drawConcrete(g, col, row) {
+        var x = col * TILE;
+        var y = row * TILE;
+        g.fillStyle = '#b8b4ab';
+        g.fillRect(x, y, TILE, TILE);
+        g.fillStyle = '#a5a198';
+        g.fillRect(x, y + TILE - 1, TILE, 1);
+        g.fillRect(x + TILE - 1, y, 1, TILE);
+        g.fillRect(x + ((col * 11 + row * 3) % 24) + 4, y + ((col * 7 + row * 13) % 22) + 5, 2, 2);
+    }
+
+    // Bamboo fence: a rail along the fence line with posts
+    function drawFence(g, col, row) {
+        var x = col * TILE;
+        var y = row * TILE;
+        var across = tileAt(col - 1, row) === 'f' || tileAt(col + 1, row) === 'f';
+        var down = tileAt(col, row - 1) === 'f' || tileAt(col, row + 1) === 'f';
+        g.fillStyle = '#b08a46';
+        if (across) { g.fillRect(x, y + TILE / 2 - 3, TILE, 6); }
+        if (down) { g.fillRect(x + TILE / 2 - 3, y, 6, TILE); }
+        g.fillStyle = '#8a6a32';
+        g.beginPath();
+        g.arc(x + TILE / 2, y + TILE / 2, 5, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = '#d2b06a';
+        g.beginPath();
+        g.arc(x + TILE / 2 - 1, y + TILE / 2 - 1, 2.5, 0, Math.PI * 2);
+        g.fill();
+    }
+
     function drawTileFloor(g, col, row) {
         g.fillStyle = (col + row) % 2 === 0 ? C.tileA : C.tileB;
         g.fillRect(col * TILE, row * TILE, TILE, TILE);
@@ -311,15 +397,16 @@
     function drawWall(g, col, row, isWindow) {
         var x = col * TILE;
         var y = row * TILE;
-        g.fillStyle = C.wall;
+        var walls = level.walls || { color: C.wall, top: C.wallTop };
+        g.fillStyle = walls.color;
         g.fillRect(x, y, TILE, TILE);
         // a lighter top edge gives the walls a little depth
-        g.fillStyle = C.wallTop;
+        g.fillStyle = walls.top;
         g.fillRect(x, y, TILE, 6);
         if (isWindow) {
             g.fillStyle = C.windowPane;
             g.fillRect(x + 5, y + 10, TILE - 10, TILE - 18);
-            g.fillStyle = C.wall;
+            g.fillStyle = walls.color;
             g.fillRect(x + TILE / 2 - 1, y + 10, 2, TILE - 18);
         }
     }
@@ -383,8 +470,8 @@
         var h = (group.maxR - group.minR + 1) * TILE;
         var pad = 4;
 
-        // soft shadow under everything except the door and stairs
-        if (group.ch !== 'F' && group.ch !== 'S') {
+        // soft shadow under everything except the door, stairs and trees (they draw their own)
+        if (group.ch !== 'F' && group.ch !== 'S' && group.ch !== 'T') {
             g.fillStyle = C.shadow;
             roundRect(g, x + pad + 2, y + pad + 3, w - pad * 2, h - pad * 2, 6);
             g.fill();
@@ -436,7 +523,29 @@
                 g.fill();
                 break;
 
-            case 'S': // stairs: steps going up, with a label
+            case 'S': // stairs: steps going up, with a label (outdoors: a bamboo ladder)
+                if (floorUnder(group.minC, group.minR) === 'g') {
+                    g.fillStyle = 'rgba(47, 109, 58, 0.25)';
+                    g.fillRect(x + 2, y + 2, w - 4, h - 4);
+                    g.fillStyle = '#b08a46';
+                    g.fillRect(x + 8, y, 5, h);
+                    g.fillRect(x + w - 13, y, 5, h);
+                    for (var rung = 0; rung < 4; rung++) {
+                        g.fillRect(x + 8, y + 4 + rung * (h - 8) / 3, w - 16, 3);
+                    }
+                    g.strokeStyle = '#2f6d3a';
+                    g.lineWidth = 3;
+                    g.strokeRect(x + 3, y + 3, w - 6, h - 6);
+                    g.fillStyle = '#ffffff';
+                    g.font = '800 12px "Baloo 2", system-ui, sans-serif';
+                    g.textAlign = 'center';
+                    g.textBaseline = 'middle';
+                    g.lineWidth = 3;
+                    g.strokeStyle = '#2f6d3a';
+                    g.strokeText('UP', x + w / 2, y + h / 2);
+                    g.fillText('UP', x + w / 2, y + h / 2);
+                    break;
+                }
                 g.fillStyle = '#e1c48f';
                 g.fillRect(x + 2, y + 2, w - 4, h - 4);
                 g.fillStyle = '#b48a4f';
@@ -451,6 +560,45 @@
                 g.textAlign = 'center';
                 g.textBaseline = 'middle';
                 g.fillText('UP', x + w / 2, y + h / 2);
+                break;
+
+            case 'R': // nipa roof of the bahay kubo: thatch rows and a ridge down the middle
+                g.fillStyle = '#c69c52';
+                roundRect(g, x + 2, y + 2, w - 4, h - 4, 6);
+                g.fill();
+                g.strokeStyle = '#a57c38';
+                g.lineWidth = 1.5;
+                for (var ty = y + 9; ty < y + h - 4; ty += 7) {
+                    for (var tx = x + 6 + ((ty / 7) % 2) * 5; tx < x + w - 8; tx += 10) {
+                        g.beginPath();
+                        g.moveTo(tx, ty);
+                        g.lineTo(tx + 4, ty + 4);
+                        g.stroke();
+                    }
+                }
+                g.fillStyle = '#7d5a26';
+                g.fillRect(x + w / 2 - 3, y + 2, 6, h - 4);
+                g.strokeStyle = '#7d5a26';
+                g.lineWidth = 2;
+                roundRect(g, x + 2, y + 2, w - 4, h - 4, 6);
+                g.stroke();
+                break;
+
+            case 'T': // a mango tree seen from above
+                g.fillStyle = C.shadow;
+                g.beginPath();
+                g.ellipse(x + w / 2 + 3, y + h / 2 + 5, w / 2, h / 2 - 3, 0, 0, Math.PI * 2);
+                g.fill();
+                g.fillStyle = '#2f7a34';
+                [[0.5, 0.42, 0.42], [0.3, 0.6, 0.3], [0.7, 0.62, 0.3]].forEach(function (b) {
+                    g.beginPath();
+                    g.arc(x + w * b[0], y + h * b[1], w * b[2], 0, Math.PI * 2);
+                    g.fill();
+                });
+                g.fillStyle = '#4a9a43';
+                g.beginPath();
+                g.arc(x + w * 0.42, y + h * 0.36, w * 0.18, 0, Math.PI * 2);
+                g.fill();
                 break;
 
             case 'F': // front door (closed)
@@ -490,12 +638,12 @@
         var bob = player.walkTime > 0 && !reducedMotion.matches ? Math.sin(player.walkTime * 14) * 1.2 : 0;
         var fx = player.faceX;
         var fy = player.faceY;
-        if (carrying && isAlive(carrying.def)) {
+        if (carrying && carrying.def.walks) {
             // family and pets walk right behind you, holding your hand
             drawItem(ctx, carrying.type, player.x - fx * 15, player.y - fy * 15, fx, fy, 1);
         }
         drawPerson(ctx, player.x, player.y, { shirt: C.shirt, hair: C.hair, faceX: fx, faceY: fy, bob: bob });
-        if (carrying && !isAlive(carrying.def)) {
+        if (carrying && !carrying.def.walks) {
             // objects are carried in front of you
             drawItem(ctx, carrying.type, player.x + fx * 11, player.y + fy * 11 + bob, fx, fy, 0.8);
         }
@@ -614,6 +762,74 @@
             case 'dog':
             case 'cat':
                 drawPet(g, type, faceX, faceY);
+                break;
+
+            case 'chicken': // manok: white body, red comb, yellow beak
+                g.rotate(Math.atan2(faceY, faceX));
+                g.fillStyle = C.shadow;
+                g.beginPath();
+                g.ellipse(1, 3, 8, 5, 0, 0, Math.PI * 2);
+                g.fill();
+                g.fillStyle = '#7a4a2a';
+                g.beginPath();
+                g.moveTo(-5, 0); g.lineTo(-11, -4); g.lineTo(-10, 4);
+                g.fill();
+                g.fillStyle = '#f3ede2';
+                g.beginPath();
+                g.ellipse(-1, 0, 7, 5.5, 0, 0, Math.PI * 2);
+                g.fill();
+                g.beginPath();
+                g.arc(6, 0, 3.6, 0, Math.PI * 2);
+                g.fill();
+                g.fillStyle = '#d9342b';
+                g.fillRect(4, -1.2, 4, 2.4);
+                g.fillStyle = '#f2b23a';
+                g.beginPath();
+                g.moveTo(9, -1.5); g.lineTo(12, 0); g.lineTo(9, 1.5);
+                g.fill();
+                break;
+
+            case 'bird': // a birdcage with a little yellow bird inside
+                shadowUnder(g, 20, 20);
+                g.fillStyle = '#e9d9a8';
+                g.beginPath();
+                g.arc(0, 0, 10, 0, Math.PI * 2);
+                g.fill();
+                g.fillStyle = '#f5d33d';
+                g.beginPath();
+                g.ellipse(0, 1, 4, 3, 0, 0, Math.PI * 2);
+                g.fill();
+                g.beginPath();
+                g.arc(3, -1, 2.2, 0, Math.PI * 2);
+                g.fill();
+                g.strokeStyle = '#6b5a3a';
+                g.lineWidth = 1.2;
+                for (var bar = -6; bar <= 6; bar += 4) {
+                    g.beginPath();
+                    g.moveTo(bar, -9);
+                    g.lineTo(bar, 9);
+                    g.stroke();
+                }
+                g.lineWidth = 2;
+                g.beginPath();
+                g.arc(0, 0, 10, 0, Math.PI * 2);
+                g.stroke();
+                break;
+
+            case 'laptop': // a school laptop, open
+                shadowUnder(g, 22, 16);
+                g.fillStyle = '#4b535b';
+                roundRect(g, -11, -8, 22, 8, 2);
+                g.fill();
+                g.fillStyle = '#7fb1d6';
+                g.fillRect(-9, -7, 18, 6);
+                g.fillStyle = '#9aa3ab';
+                roundRect(g, -11, 0, 22, 9, 2);
+                g.fill();
+                g.fillStyle = '#6c757d';
+                for (var kr = 0; kr < 2; kr++) {
+                    g.fillRect(-8, 2 + kr * 3, 16, 1.5);
+                }
                 break;
 
             case 'documents': // a yellow folder with papers sticking out
@@ -1111,17 +1327,110 @@
     }
 
     /* -----------------------------------------------------------------
-       GAME FLOW: title -> playing <-> paused
+       GAME FLOW: title (pick a house) -> playing <-> paused -> end
        ----------------------------------------------------------------- */
-    function startGame() {
-        loadLevel(window.BAHA_LEVELS[0]);
+    var levelIndex = 0;
+
+    function startGame(index) {
+        levelIndex = index;
+        loadLevel(window.BAHA_LEVELS[index]);
         titleScreen.hidden = true;
         endScreen.hidden = true;
+        pauseScreen.hidden = true;
         pauseBtn.hidden = false;
         hudWarning.hidden = false;
         mode = 'playing';
         showBanner();
         canvas.focus();
+    }
+
+    // Back to the title screen, where you pick a house
+    function showTitle() {
+        mode = 'title';
+        releaseAll();
+        endScreen.hidden = true;
+        pauseScreen.hidden = true;
+        pauseBtn.hidden = true;
+        hudWarning.hidden = true;
+        buildHouseCards();
+        titleScreen.hidden = false;
+        var first = houseList.querySelector('button');
+        if (first) { first.focus(); }
+    }
+
+    // One button per house, with its difficulty and your best result
+    function buildHouseCards() {
+        var best = loadBest();
+        houseList.textContent = '';
+        window.BAHA_LEVELS.forEach(function (lv, i) {
+            var b = best[lv.id];
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'house-card';
+
+            var top = document.createElement('span');
+            top.className = 'house-top';
+            var name = document.createElement('span');
+            name.className = 'house-name';
+            name.textContent = lv.name;
+            var diff = document.createElement('span');
+            diff.className = 'house-diff diff-' + (lv.difficulty || 'medium').toLowerCase();
+            diff.textContent = lv.difficulty || '';
+            top.appendChild(name);
+            top.appendChild(diff);
+
+            var blurb = document.createElement('span');
+            blurb.className = 'house-blurb';
+            blurb.textContent = lv.blurb || '';
+
+            var bestEl = document.createElement('span');
+            bestEl.className = 'house-best';
+            bestEl.textContent = b ? 'Best: ' + b.score + '  ' + starText(b.stars) : 'Not played yet';
+
+            btn.appendChild(top);
+            btn.appendChild(blurb);
+            btn.appendChild(bestEl);
+            btn.setAttribute('aria-label', 'Play ' + lv.name + ', ' + (lv.difficulty || '') + '. ' +
+                (b ? 'Best score ' + b.score + ', ' + b.stars + ' of 3 stars.' : 'Not played yet.'));
+            btn.addEventListener('click', function () { startGame(i); });
+            houseList.appendChild(btn);
+        });
+    }
+
+    function starText(n) {
+        return '★★★'.slice(0, n) + '☆☆☆'.slice(0, 3 - n);
+    }
+
+    /* -----------------------------------------------------------------
+       HIGH SCORES: kept in this browser (localStorage). If the browser
+       blocks storage (e.g. private mode), the game still works, it just
+       doesn't remember.
+       ----------------------------------------------------------------- */
+    var BEST_KEY = 'baha.best.v1';
+
+    function loadBest() {
+        try {
+            return JSON.parse(window.localStorage.getItem(BEST_KEY)) || {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    // Returns true if this is a new best score for the house
+    function saveBest(id, total, stars) {
+        var best = loadBest();
+        var old = best[id];
+        var isNew = !old || total > old.score;
+        best[id] = {
+            score: isNew ? total : old.score,
+            stars: Math.max(stars, old ? old.stars : 0)
+        };
+        try {
+            window.localStorage.setItem(BEST_KEY, JSON.stringify(best));
+        } catch (e) {
+            // storage not available: nothing to do
+        }
+        return isNew && total > 0;
     }
 
     /* -----------------------------------------------------------------
@@ -1168,8 +1477,11 @@
             listNames(familyLost) + (familyLost.length > 1 ? ' were' : ' was') + ' left downstairs. Family comes first: try again!');
 
         var starEl = document.getElementById('end-stars');
-        setText(starEl, '★★★'.slice(0, stars) + '☆☆☆'.slice(0, 3 - stars));
+        setText(starEl, starText(stars));
         starEl.setAttribute('aria-label', stars + ' of 3 stars');
+
+        var isBest = saveBest(level.id, total, stars);
+        document.getElementById('end-best').hidden = !isBest;
 
         setText(document.getElementById('end-score'), 'Score ' + total);
         setText(document.getElementById('end-breakdown'), score + ' for what you saved' +
@@ -1179,10 +1491,18 @@
         fillList('end-lost', lost, 'Nothing. Great job!', false);
         fillTips(lost);
 
+        // "Next house" once the whole family is safe (and there is a next house)
+        var next = window.BAHA_LEVELS[levelIndex + 1];
+        nextBtn.hidden = !(familySafe && next);
+        if (next) { setText(nextBtn, 'Next: ' + next.name); }
+        // only one big yellow button at a time
+        document.getElementById('again-btn').className = 'btn ' + (nextBtn.hidden ? 'btn-primary' : 'btn-secondary');
+
         endScreen.hidden = false;
+        endScreen.scrollTop = 0;
         announce((familySafe ? 'Your whole family is safe. ' : 'Not everyone made it. ') +
-            'Score ' + total + ', ' + stars + ' of 3 stars.');
-        document.getElementById('again-btn').focus();
+            'Score ' + total + ', ' + stars + ' of 3 stars.' + (isBest ? ' New best score!' : ''));
+        (nextBtn.hidden ? document.getElementById('again-btn') : nextBtn).focus();
     }
 
     function listNames(list) {
@@ -1332,9 +1652,11 @@
     /* -----------------------------------------------------------------
        BUTTONS AND WINDOW EVENTS
        ----------------------------------------------------------------- */
-    document.getElementById('start-btn').addEventListener('click', startGame);
     document.getElementById('resume-btn').addEventListener('click', resume);
-    document.getElementById('again-btn').addEventListener('click', startGame);
+    document.getElementById('quit-btn').addEventListener('click', showTitle);
+    document.getElementById('again-btn').addEventListener('click', function () { startGame(levelIndex); });
+    document.getElementById('houses-btn').addEventListener('click', showTitle);
+    nextBtn.addEventListener('click', function () { startGame(levelIndex + 1); });
     pauseBtn.addEventListener('click', pause);
 
     // Switching tabs or apps pauses the game, and lets go of every key
@@ -1364,12 +1686,13 @@
     window.BAHA_TEST = {
         state: function () {
             return { mode: mode, player: player, items: items, carrying: carrying, nearby: nearby, score: score,
-                elapsed: elapsed, phase: phase, water: water };
+                elapsed: elapsed, phase: phase, water: water, levelIndex: levelIndex, level: level };
         }
     };
 
-    // Show the house behind the title screen, then start the loop
+    // Show the first house behind the title screen, list the houses, then start the loop
     loadLevel(window.BAHA_LEVELS[0]);
+    buildHouseCards();
     window.requestAnimationFrame(function (t) {
         lastTime = t;
         window.requestAnimationFrame(loop);

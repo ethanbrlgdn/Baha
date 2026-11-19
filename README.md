@@ -8,8 +8,18 @@ hosted on GitHub Pages as a static site.
 
 ## Play
 
-- **Online:** (GitHub Pages link, added once it's published)
+- **Online:** https://ethanbrlgdn.github.io/Baha/
 - **On your computer:** double-click `index.html`.
+
+## Houses
+
+| House | Difficulty | What makes it different |
+|---|---|---|
+| Bahay Kubo | Easy | A nipa hut in a fenced yard. Carry everyone up the bamboo ladder, chickens too |
+| Two-Storey House | Medium | Four rooms and a heavy ref: is it worth the trip? |
+| Apartment | Hard | The building's stairs are out in the hallway, and there's less time |
+
+Your best score and stars for each house are saved in your browser.
 
 ## Controls
 
@@ -22,7 +32,7 @@ hosted on GitHub Pages as a static site.
 Carry one thing at a time onto the stairs to save it. Heavy things (the ref, the TV,
 the rice) slow you down, and Lola and Lolo walk slowly.
 
-You have 2 minutes, following PAGASA's rainfall warning colors:
+You have about 2 minutes (less in the Apartment), following PAGASA's rainfall warning colors:
 
 - **Yellow:** flooding is possible. Move things upstairs while it's dry.
 - **Orange:** the water comes in and rises, and you walk slower.
@@ -36,7 +46,7 @@ finish early), stars, and real flood-safety tips.
 
 | File | What it does |
 |---|---|
-| `index.html` | The page: top bar, game canvas, title/pause screens, phone buttons |
-| `css/style.css` | Colors, layout, rain background, buttons |
-| `js/levels.js` | House layouts drawn as text (one character per tile) |
-| `js/game.js` | Drawing, movement, collisions, controls, pause |
+| `index.html` | The page: top bar, game canvas, title/pause/end screens, phone buttons |
+| `css/style.css` | Colors, layout, rain background, buttons, house cards |
+| `js/levels.js` | The three houses drawn as text (one character per tile), with items and timings |
+| `js/game.js` | Drawing, movement, items, water and timer, end screen, high scores, controls |

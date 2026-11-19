@@ -37,14 +37,15 @@
             <canvas id="game" aria-label="Top-down view of the house" role="img"></canvas>
 
             <!-- Title screen -->
-            <section class="overlay" id="title-screen" aria-labelledby="title-heading">
-                <div class="panel">
+            <section class="overlay overlay-page" id="title-screen" aria-labelledby="title-heading">
+                <div class="panel panel-wide">
                     <p class="eyebrow">Flood survival game</p>
                     <h2 class="game-title" id="title-heading">Baha!</h2>
                     <p class="lead">A typhoon is coming and the water is rising. Carry your family, pets and
                         important things up the stairs before the ground floor floods.</p>
 
-                    <button type="button" class="btn btn-primary" id="start-btn">Start</button>
+                    <h3 class="pick-heading">Choose a house</h3>
+                    <div class="house-list" id="house-list"></div>
 
                     <div class="how">
                         <h3>How to play</h3>
@@ -63,7 +64,10 @@
             <section class="overlay" id="pause-screen" aria-labelledby="pause-heading" hidden>
                 <div class="panel">
                     <h2 id="pause-heading">Paused</h2>
-                    <button type="button" class="btn btn-primary" id="resume-btn">Resume</button>
+                    <div class="btn-row">
+                        <button type="button" class="btn btn-primary" id="resume-btn">Resume</button>
+                        <button type="button" class="btn btn-secondary" id="quit-btn">Quit</button>
+                    </div>
                 </div>
             </section>
         </div>
@@ -73,6 +77,7 @@
             <div class="panel panel-wide">
                 <h2 id="end-heading">Ligtas ang pamilya!</h2>
                 <p class="end-sub" id="end-sub"></p>
+                <p class="end-best" id="end-best" hidden>New best score!</p>
                 <p class="end-stars" id="end-stars" role="img" aria-label="0 of 3 stars"></p>
                 <p class="end-score" id="end-score"></p>
                 <p class="end-breakdown" id="end-breakdown"></p>
@@ -95,7 +100,11 @@
                     <ul id="end-tips"></ul>
                 </div>
 
-                <button type="button" class="btn btn-primary" id="again-btn">Play again</button>
+                <div class="btn-row">
+                    <button type="button" class="btn btn-primary" id="next-btn" hidden>Next house</button>
+                    <button type="button" class="btn btn-primary" id="again-btn">Play again</button>
+                    <button type="button" class="btn btn-secondary" id="houses-btn">Choose house</button>
+                </div>
             </div>
         </section>
 

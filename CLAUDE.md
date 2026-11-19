@@ -32,6 +32,6 @@ stairs before the ground floor floods. Original concept with a Filipino setting
 3. ✅ Rising water in PAGASA phases (Yellow → Orange → Red), timer, water slows walking,
    items left downstairs at Red are lost; end screen with what was saved/lost, score,
    stars, and real flood-safety tips. (2 and 3 done 2026-11-20)
-4. Three houses (Bahay Kubo, Two-Storey House, Apartment), high scores in localStorage, polish.
+4. ✅ Three houses (Bahay Kubo, Two-Storey House, Apartment), high scores in localStorage, polish (done 2026-11-20).
 5. Publish on GitHub Pages under the owner's account `ethanbrlgdn` (owner creates the repo
    on github.com; `gh` CLI is not installed). It's a solo project (confirmed 2026-11-20).

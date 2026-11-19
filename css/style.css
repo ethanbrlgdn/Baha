@@ -263,6 +263,105 @@ button {
     font-weight: 700;
 }
 
+/* ---- House picker (title screen) ---- */
+.pick-heading {
+    margin: 0 0 var(--space-3);
+    font-size: 1rem;
+    text-align: left;
+}
+
+.house-list {
+    display: grid;
+    gap: var(--space-3);
+}
+
+.house-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    width: 100%;
+    min-height: 56px;
+    padding: var(--space-3) var(--space-4);
+    border: 2px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--night-700);
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.house-card:hover {
+    border-color: var(--accent);
+    background: var(--night-600);
+}
+
+.house-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.house-name {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.25rem;
+    line-height: 1.2;
+}
+
+/* difficulty tags: dark text on light colors for contrast */
+.house-diff {
+    padding: 2px var(--space-2);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #10202e;
+}
+
+.diff-easy   { background: #8fd18f; }
+.diff-medium { background: #f5d33d; }
+.diff-hard   { background: #ff9c8a; }
+
+.house-blurb {
+    color: var(--text-muted);
+    font-size: 0.92rem;
+}
+
+.house-best {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+/* ---- Rows of buttons (pause and end screens) ---- */
+.btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-3);
+}
+
+.btn-secondary {
+    background: transparent;
+    color: var(--text);
+    box-shadow: inset 0 0 0 2px var(--text-muted);
+}
+
+.btn-secondary:hover {
+    background: var(--night-600);
+}
+
+.end-best {
+    display: inline-block;
+    margin: var(--space-3) 0 0;
+    padding: var(--space-1) var(--space-3);
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-weight: 700;
+}
+
 /* ---- End screen ---- */
 .overlay-page {
     position: fixed;
@@ -537,7 +636,8 @@ button {
         animation: none;
     }
 
-    .btn {
+    .btn,
+    .house-card {
         transition: none;
     }
 
