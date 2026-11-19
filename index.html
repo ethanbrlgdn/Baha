@@ -44,6 +44,8 @@
                         <h3>How to play</h3>
                         <ul>
                             <li><span class="key-hint">Move:</span> arrow keys or WASD (on phones, the buttons below)</li>
+                            <li><span class="key-hint">Grab / drop:</span> Space or E (on phones, the Grab button)</li>
+                            <li><span class="key-hint">Save it:</span> carry it onto the stairs (UP). One thing at a time, and heavy things slow you down!</li>
                             <li><span class="key-hint">Pause:</span> P or Esc</li>
                         </ul>
                     </div>
@@ -59,7 +61,14 @@
             </section>
         </div>
 
-        <!-- PHONE CONTROLS: a direction pad (hold to move) -->
+        <!-- STATUS: what you're carrying or can grab, family saved, score -->
+        <div class="status">
+            <p class="status-hint" id="hud-hint">Find your family, pets and things.</p>
+            <p class="status-stats"><span id="hud-family">Family 0/4</span> <span id="hud-score">Score 0</span></p>
+        </div>
+        <p class="sr-only" id="announcer" aria-live="polite"></p>
+
+        <!-- PHONE CONTROLS: a direction pad (hold to move) and the Grab button -->
         <div class="controls" aria-label="Touch controls">
             <div class="dpad">
                 <button type="button" class="dpad-btn up" data-dir="up" aria-label="Move up">
@@ -75,6 +84,10 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
                 </button>
             </div>
+            <button type="button" class="grab-btn" id="grab-btn" aria-label="Grab (nothing in reach)">
+                <span class="grab-main" id="grab-main">Grab</span>
+                <span class="grab-sub" id="grab-sub"></span>
+            </button>
         </div>
 
         <footer class="credits">

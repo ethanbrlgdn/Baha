@@ -16,7 +16,11 @@ hosted on GitHub Pages as a static site.
 | Action | Keyboard | Phone |
 |---|---|---|
 | Move | Arrow keys or WASD | Direction buttons |
+| Grab / drop | Space, E or Enter | Grab button |
 | Pause | P or Esc | Pause button |
+
+Carry one thing at a time onto the stairs to save it. Heavy things (the ref, the TV,
+the rice) slow you down, and Lola and Lolo walk slowly.
 
 ## Files
 

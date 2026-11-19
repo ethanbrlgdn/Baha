@@ -249,11 +249,106 @@ button {
     background: #f7c05a;
 }
 
+/* ---- Status line under the house ---- */
+.status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-4);
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--night-800);
+}
+
+.status p {
+    margin: 0;
+}
+
+.status-hint {
+    flex: 1 1 260px;
+    font-weight: 700;
+}
+
+.status-stats {
+    display: flex;
+    gap: var(--space-3);
+    color: var(--accent);
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.1rem;
+    white-space: nowrap;
+}
+
+/* Only for screen readers */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* ---- Phone controls (shown on touch screens) ---- */
 .controls {
     display: none;
-    justify-content: center;
+    width: min(100%, 420px);
+    margin: 0 auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
     padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Big round Grab button for the right thumb */
+.grab-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 112px;
+    height: 112px;
+    padding: var(--space-2);
+    border: 2px solid var(--line);
+    border-radius: 50%;
+    background: var(--night-700);
+    color: var(--text);
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
+}
+
+.grab-main {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.35rem;
+    line-height: 1.1;
+}
+
+.grab-sub {
+    max-width: 92px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+}
+
+/* something is in reach (or in your hands): the button lights up */
+.grab-btn.is-ready {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.grab-btn.is-down {
+    background: var(--accent-dark);
+    color: var(--on-accent);
 }
 
 @media (pointer: coarse) {
