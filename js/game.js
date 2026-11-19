@@ -54,7 +54,7 @@
         lolo:       { name: 'Lolo',           group: 'family',    points: 100, speed: 0.6,  alive: true, walks: true },
         bunso:      { name: 'Bunso',          group: 'family',    points: 100, speed: 0.9,  alive: true, walks: true },
         nene:       { name: 'Nene',           group: 'family',    points: 100, speed: 0.9,  alive: true, walks: true },
-        dog:        { name: 'Bantay the dog', group: 'pet',       points: 50,  speed: 0.9,  alive: true, walks: true },
+        dog:        { name: 'Mocha the dog',  group: 'pet',      points: 50,  speed: 0.9,  alive: true, walks: true },
         cat:        { name: 'Muning the cat', group: 'pet',       points: 50,  speed: 1,    alive: true, walks: true },
         chicken:    { name: 'Manok',          group: 'pet',       points: 20,  speed: 1,    alive: true, walks: true },
         bird:       { name: 'Birdcage',       group: 'pet',       points: 40,  speed: 0.95, alive: true },
@@ -105,8 +105,7 @@
         windowPane: '#8fc3e6',
         label: 'rgba(60, 40, 22, 0.55)',
         shadow: 'rgba(0, 0, 0, 0.25)',
-        shirt: '#e8841a',
-        skin: '#8d5a3b',
+        skin: '#8d5a3b',          // the family's skin (the player has his own colors in LOOK)
         hair: '#22160e'
     };
 
@@ -142,13 +141,15 @@
     var mode = 'title';          // 'title' | 'playing' | 'paused'
     var lastTime = 0;
 
-    var player = { x: 0, y: 0, faceX: 0, faceY: 1, walkTime: 0 };
+    var player = { x: 0, y: 0, faceX: 0, faceY: 1, walkTime: 0, cheer: 0 };   // cheer: seconds of fist pump left
 
     var items = [];              // { type, def, x, y, state: 'home' | 'carried' | 'saved' }
     var carrying = null;         // the item in your hands, or null
     var nearby = null;           // the item you'd pick up if you pressed Grab now
     var score = 0;
     var toasts = [];             // floating "+50" messages: { text, x, y, age }
+    var speech = null;           // the player's speech bubble: { text, age }
+    var SPEECH_TIME = 2.4;       // seconds the bubble stays up
     var clock = 0;               // seconds of play, for the pulsing highlight
     var stairsCenter = { x: 0, y: 0 };
 
@@ -197,14 +198,16 @@
         player.y = level.spawn.row * TILE;
         player.faceX = 0;
         player.faceY = 1;
+        player.cheer = 0;
 
-        items = (level.items || []).map(function (it) {
+        items =(level.items || []).map(function (it) {
             return { type: it.type, def: ITEM_TYPES[it.type], x: it.col * TILE, y: it.row * TILE, state: 'home' };
         });
         carrying = null;
         nearby = null;
         score = 0;
         toasts = [];
+        speech = null;
         clock = 0;
 
         // the middle of all the stair tiles, where "+points" messages appear
@@ -634,20 +637,32 @@
             drawHighlight(nearby);
         }
 
-        // the player, with whatever they're carrying
-        var bob = player.walkTime > 0 && !reducedMotion.matches ? Math.sin(player.walkTime * 14) * 1.2 : 0;
+        // the player, with whatever he's carrying
         var fx = player.faceX;
         var fy = player.faceY;
+        var dir = Math.abs(fx) > Math.abs(fy) + 0.01 ? (fx > 0 ? 'right' : 'left') : (fy < 0 ? 'up' : 'down');
+        var holding = carrying && !carrying.def.walks;
+        var pose = player.cheer > 0 ? 'cheer' : (holding ? 'carry' : 'free');
+        // where a held object sits: at his chest, on the side he's facing
+        var holdX = player.x + (dir === 'left' ? -8 : (dir === 'right' ? 8 : 0));
+        var holdY = player.y - 10;
+
         if (carrying && carrying.def.walks) {
             // family and pets walk right behind you, holding your hand
             drawItem(ctx, carrying.type, player.x - fx * 15, player.y - fy * 15, fx, fy, 1);
         }
-        drawPerson(ctx, player.x, player.y, { shirt: C.shirt, hair: C.hair, faceX: fx, faceY: fy, bob: bob });
-        if (carrying && !carrying.def.walks) {
-            // objects are carried in front of you
-            drawItem(ctx, carrying.type, player.x + fx * 11, player.y + fy * 11 + bob, fx, fy, 0.8);
+        if (holding && dir === 'up') {
+            drawItem(ctx, carrying.type, holdX, holdY - 4, fx, fy, 0.8);   // facing away: it's in front of him, behind his body
+        }
+        drawPlayerSprite(ctx, player.x, player.y, dir, player.walkTime > 0, pose, clock, player.cheer);
+        if (holding && dir !== 'up') {
+            drawItem(ctx, carrying.type, holdX, holdY, fx, fy, 0.8);
         }
 
+        if (nearby && mode === 'playing') {
+            drawPickLabel(nearby);
+        }
+        drawSpeech();
         drawToasts();
         drawBanner();
     }
@@ -685,6 +700,487 @@
         ctx.textBaseline = 'middle';
         ctx.fillText(banner.text, w / 2, 31, w - 24);
         ctx.globalAlpha = 1;
+    }
+
+    /* -----------------------------------------------------------------
+       THE PLAYER: a teen in a backwards red cap, messy black hair, an
+       open grey plaid flannel with rolled-up sleeves, a cord necklace,
+       a bracelet, jeans and sneakers. Drawn standing up (3/4 view) with
+       normal proportions: about 4 heads tall (a little stylized, so he
+       still reads on a small phone screen).
+       Change the colors and sizes in LOOK to restyle him.
+       ----------------------------------------------------------------- */
+    var LOOK = {
+        // colors
+        outline: '#1B1B1F',
+        hair: '#17151A',             // messy black hair
+        skin: '#D9A47C',
+        skinShade: '#BE8761',
+        cap: '#D6322F',              // red cap, worn backwards
+        capShade: '#A62421',
+        capStrap: '#1B1B1F',         // the strap at the back of the cap (it faces forward)
+        buckle: '#CFCFCF',
+        flannel: '#A3A49D',          // grey plaid flannel
+        flannelShade: '#83847E',
+        plaidDark: 'rgba(35, 35, 40, 0.45)',
+        plaidLight: 'rgba(255, 255, 255, 0.35)',
+        jeans: '#5B7DA6',
+        jeansShade: '#46668D',
+        shoes: '#EEEEE9',
+        cord: '#1B1B1F',             // necklace cord
+        pendant: '#E2C15A',
+        bracelet: '#E1E1E1',
+        phone: '#5A534A',            // phone in a brown case
+        dust: 'rgba(214, 205, 186, 0.9)',
+
+        // sizes (canvas pixels; his feet stand on the 10px-radius hitbox)
+        line: 1.4,                   // outline thickness
+        headR: 6,                    // head radius
+        torsoW: 11,                  // shirt width
+        legW: 3.6,                   // leg thickness
+        armW: 2.8                    // arm thickness
+    };
+    var CHEER_TIME = 0.8;            // seconds he celebrates after saving something
+
+    // Draws the player with his feet on (x, y + 9), so he stands on the hitbox.
+    //   dir:    'down' (toward you), 'up' (away), 'left' or 'right'
+    //   moving: true while walking (legs and arms swing)
+    //   pose:   'free' (phone up for a selfie when standing, arms swinging when walking),
+    //           'carry' (arms forward, holding something), 'cheer' (fist pump)
+    //   t:      seconds of play, drives the animation
+    //   cheerLeft: seconds of the fist pump still to go (for the dust puff)
+    function drawPlayerSprite(g, x, y, dir, moving, pose, t, cheerLeft) {
+        var K = LOOK;
+        var still = reducedMotion.matches;
+        var side = dir === 'left' || dir === 'right';
+
+        // animation numbers
+        var step = moving && !still ? Math.sin(t * 12) : 0;                // -1..1 walking cycle
+        var bounce = still ? 0 : (moving ? Math.abs(step) * 1 : (Math.sin(t * 2.5) + 1) * 0.35);
+        if (pose === 'cheer' && !still) {
+            bounce = 1.5 + Math.sin(t * 20) * 0.5;                         // a little hop
+        }
+        var by = -bounce;                                                   // everything above the legs moves up
+        var hipY = -17 + by * 0.5;
+        var shoulderY = -29 + by;
+
+        g.save();
+        g.translate(x, y + 9);
+        if (dir === 'left') {
+            g.scale(-1, 1);                                                 // left is the right side, mirrored
+        }
+        g.lineJoin = 'round';
+        g.lineCap = 'round';
+        g.strokeStyle = K.outline;
+        g.lineWidth = K.line;
+
+        // fills a shape, adds shading/pattern inside it, then outlines it
+        function part(color, path, inside) {
+            g.beginPath();
+            path();
+            g.fillStyle = color;
+            g.fill();
+            if (inside) {
+                g.save();
+                g.clip();
+                inside();
+                g.restore();
+                g.beginPath();
+                path();
+            }
+            g.strokeStyle = K.outline;
+            g.lineWidth = K.line;
+            g.stroke();
+        }
+
+        // a thick rounded line with an outline (legs, arm parts)
+        function limb(x1, y1, x2, y2, color, w) {
+            g.beginPath();
+            g.moveTo(x1, y1);
+            g.lineTo(x2, y2);
+            g.lineWidth = w + K.line * 2;
+            g.strokeStyle = K.outline;
+            g.stroke();
+            g.lineWidth = w;
+            g.strokeStyle = color;
+            g.stroke();
+            g.lineWidth = K.line;
+        }
+
+        // an arm: flannel sleeve to the elbow (rolled up), bare forearm, hand
+        function arm(sx, sy, ex, ey, hx, hy, far, bracelet) {
+            limb(ex, ey, hx, hy, far ? K.skinShade : K.skin, K.armW - 0.3);
+            limb(sx, sy, ex, ey, far ? K.flannelShade : K.flannel, K.armW);
+            g.fillStyle = K.flannelShade;                                   // rolled cuff at the elbow
+            g.beginPath();
+            g.arc(ex, ey, K.armW / 2 + 0.3, 0, Math.PI * 2);
+            g.fill();
+            if (bracelet) {
+                var bx = hx + (ex - hx) * 0.22;
+                var byy = hy + (ey - hy) * 0.22;
+                g.fillStyle = K.bracelet;
+                g.beginPath();
+                g.arc(bx, byy, 1.1, 0, Math.PI * 2);
+                g.fill();
+            }
+            part(far ? K.skinShade : K.skin, function () { g.arc(hx, hy, 1.6, 0, Math.PI * 2); });
+        }
+
+        // plaid pattern for the flannel (drawn inside the shirt shape)
+        function plaid(x0, y0, w, h) {
+            g.fillStyle = K.plaidDark;
+            for (var px = x0 + 1; px < x0 + w; px += 3) { g.fillRect(px, y0, 1, h); }
+            for (var py = y0 + 1; py < y0 + h; py += 3) { g.fillRect(x0, py, w, 1); }
+            g.fillStyle = K.plaidLight;
+            for (px = x0 + 2.5; px < x0 + w; px += 6) { g.fillRect(px, y0, 0.6, h); }
+        }
+
+        function phone(px, py) {
+            part(K.phone, function () { roundRect(g, px, py, 3.4, 5.6, 0.8); });
+            g.fillStyle = '#2a2a2a';                                        // camera lenses
+            g.fillRect(px + 0.7, py + 0.7, 0.9, 0.9);
+            g.fillRect(px + 0.7, py + 1.9, 0.9, 0.9);
+        }
+
+        // ---- shadow and dust puff ----
+        g.fillStyle = C.shadow;
+        g.beginPath();
+        g.ellipse(0, 0, 8, 2.8, 0, 0, Math.PI * 2);
+        g.fill();
+        if (pose === 'cheer') {
+            var p = 1 - cheerLeft / CHEER_TIME;                             // 0 -> 1 over the celebration
+            g.globalAlpha = still ? 0.7 : Math.max(0, 1 - p);
+            g.fillStyle = K.dust;
+            [[-7, 0], [7, 0], [-4, 2], [4, 2]].forEach(function (d, i) {
+                g.beginPath();
+                g.arc(d[0] * (still ? 1 : 1 + p * 0.6), d[1] - (still ? 0 : p * 2), 1.8 + (still ? 0.6 : p * 1.8) - i * 0.2, 0, Math.PI * 2);
+                g.fill();
+            });
+            g.globalAlpha = 1;
+        }
+
+        // ---- legs (jeans) and sneakers ----
+        if (side) {
+            [[-step, -0.6, true], [step, 0.6, false]].forEach(function (leg) {
+                var fx = leg[0] * 3.4;
+                limb(leg[1], hipY, fx, -2, leg[2] ? K.jeansShade : K.jeans, K.legW);
+                part(K.shoes, function () { g.ellipse(fx + 1.2, -1, 3.1, 1.5, 0, 0, Math.PI * 2); });
+            });
+        } else {
+            [[-2.5, Math.max(0, step)], [2.5, Math.max(0, -step)]].forEach(function (leg) {
+                var lift = leg[1] * 2;
+                limb(leg[0], hipY, leg[0] * 1.05, -2 - lift, K.jeans, K.legW);
+                part(K.shoes, function () { g.ellipse(leg[0] * 1.05, -1.1 - lift, 2.3, 1.6, 0, 0, Math.PI * 2); });
+            });
+        }
+        // waist of the jeans
+        var ww = side ? 7.6 : 10;
+        part(K.jeans, function () { roundRect(g, -ww / 2, -19.5 + by, ww, 4.4, 1.5); }, function () {
+            g.fillStyle = K.jeansShade;
+            g.fillRect(side ? -ww / 2 : ww / 2 - 2.6, -19.5 + by, 2.6, 5);
+        });
+
+        // ---- arms behind the body ----
+        if (dir === 'up') {
+            if (pose === 'cheer') {
+                arm(-5.4, shoulderY, -7.4, -23.5 + by, -5.6, -18.5 + by, false, false);
+            } else if (pose === 'carry') {
+                arm(-5.4, shoulderY, -6.6, -24 + by, -3.4, -21.5 + by, false, false);
+                arm(5.4, shoulderY, 6.6, -24 + by, 3.4, -21.5 + by, false, true);
+            } else {
+                var swB = step * 1.6;
+                arm(-5.4, shoulderY, -6.5, -23.5 + by + swB * 0.5, -6.8, -18 + by + swB, false, false);
+                arm(5.4, shoulderY, 6.5, -23.5 + by - swB * 0.5, 6.8, -18 + by - swB, false, true);
+            }
+        } else if (side) {
+            var swF = step * 2.4;                                            // far arm swings opposite the near one
+            arm(-0.4, shoulderY, -swF * 0.5 - 0.4, -23.5 + by, -swF - 0.6, -18.5 + by, true, false);
+        }
+
+        // ---- the flannel: open at the front, collar, plaid ----
+        var tw = side ? 8 : K.torsoW;
+        part(K.flannel, function () {
+            g.moveTo(-tw / 2 + 0.6, -31 + by);
+            g.lineTo(tw / 2 - 0.6, -31 + by);
+            g.quadraticCurveTo(tw / 2 + 0.6, -31 + by, tw / 2 + 0.4, -28 + by);
+            g.lineTo(tw / 2 + 0.6, -16 + by);
+            g.lineTo(-tw / 2 - 0.6, -16 + by);
+            g.lineTo(-tw / 2 - 0.4, -28 + by);
+            g.quadraticCurveTo(-tw / 2 - 0.6, -31 + by, -tw / 2 + 0.6, -31 + by);
+            g.closePath();
+        }, function () {
+            plaid(-tw / 2 - 1, -31 + by, tw + 2, 15);
+            g.fillStyle = 'rgba(40, 40, 45, 0.18)';                          // shade on the left
+            g.fillRect(-tw / 2 - 1, -31 + by, 2.6, 15);
+        });
+
+        if (dir === 'down') {
+            // open shirt: a V of skin with the cord necklace
+            part(K.skin, function () {
+                g.moveTo(-2.4, -31 + by);
+                g.lineTo(2.4, -31 + by);
+                g.lineTo(0.3, -24.5 + by);
+                g.closePath();
+            });
+            g.lineWidth = 0.8;
+            g.beginPath();                                                   // the shirt's open edge
+            g.moveTo(0.3, -24.5 + by);
+            g.lineTo(0.3, -16 + by);
+            g.stroke();
+            g.strokeStyle = K.cord;
+            g.beginPath();
+            g.moveTo(-2, -30.8 + by);
+            g.lineTo(0, -27 + by);
+            g.lineTo(2, -30.8 + by);
+            g.stroke();
+            g.fillStyle = K.pendant;
+            g.beginPath();
+            g.arc(0, -26.3 + by, 0.9, 0, Math.PI * 2);
+            g.fill();
+            g.fillStyle = '#5b4a3a';                                         // buttons
+            g.fillRect(-1.3, -22 + by, 0.9, 0.9);
+            g.fillRect(-1.3, -19 + by, 0.9, 0.9);
+            // collar points
+            [-1, 1].forEach(function (s) {
+                part(K.flannelShade, function () {
+                    g.moveTo(s * 3.9, -31.4 + by);
+                    g.lineTo(s * 1.4, -31 + by);
+                    g.lineTo(s * 2.6, -28.4 + by);
+                    g.closePath();
+                });
+            });
+        } else if (side) {
+            // a strip of skin and the necklace cord at the open front
+            g.fillStyle = K.skin;
+            g.fillRect(tw / 2 - 1.6, -30.4 + by, 1.6, 4.2);
+            g.lineWidth = 0.8;
+            g.strokeStyle = K.cord;
+            g.beginPath();
+            g.moveTo(1.6, -31 + by);
+            g.lineTo(tw / 2 - 0.6, -27.4 + by);
+            g.stroke();
+            part(K.flannelShade, function () {                              // collar
+                g.moveTo(-2.6, -31.6 + by);
+                g.lineTo(1.6, -31.4 + by);
+                g.lineTo(-0.6, -29 + by);
+                g.closePath();
+            });
+        } else {
+            part(K.flannelShade, function () { roundRect(g, -3.4, -31.8 + by, 6.8, 2, 1); });   // collar at the back
+        }
+
+        // ---- arms in front ----
+        if (dir === 'down') {
+            if (pose === 'cheer') {
+                arm(-5.4, shoulderY, -7.6, -23.5 + by, -5.4, -18.5 + by, false, false);   // hand on hip
+                arm(5.4, shoulderY, 7.6, -34 + by, 7.8, -40.5 + by, false, true);        // fist up!
+            } else if (pose === 'carry') {
+                arm(-5.4, shoulderY, -6.6, -24 + by, -3.2, -21.5 + by, false, false);
+                arm(5.4, shoulderY, 6.6, -24 + by, 3.2, -21.5 + by, false, true);
+            } else if (moving) {
+                var sw = step * 1.6;
+                arm(-5.4, shoulderY, -6.5, -23.5 + by + sw * 0.5, -6.8, -18 + by + sw, false, false);
+                arm(5.4, shoulderY, 6.5, -23.5 + by - sw * 0.5, 6.8, -18 + by - sw, false, true);
+            } else {
+                // standing: one arm relaxed, the other holding the phone up (mirror selfie)
+                arm(-5.4, shoulderY, -6.5, -23.5 + by, -6.7, -18 + by, false, false);
+                arm(5.4, shoulderY, 8, -24.5 + by, 7.2, -30.5 + by, false, true);
+                phone(5.6, -36 + by);
+            }
+        } else if (side) {
+            // near arm
+            if (pose === 'cheer') {
+                arm(0.4, shoulderY, 5, -32 + by, 8.2, -37.5 + by, false, true);   // fist up, out in front
+            } else if (pose === 'carry') {
+                arm(0.4, shoulderY, 1.6, -23.5 + by, 6, -22 + by, false, true);
+            } else if (moving) {
+                var swN = step * 2.4;
+                arm(0.4, shoulderY, swN * 0.5 + 0.4, -23.5 + by, swN + 0.6, -18.5 + by, false, true);
+            } else {
+                arm(0.4, shoulderY, 3, -24 + by, 4.6, -30 + by, false, true);
+                phone(4.4, -36 + by);
+            }
+        } else if (pose === 'cheer') {
+            arm(5.4, shoulderY, 7.6, -34 + by, 7.8, -40.5 + by, false, true);   // from behind: fist up
+        }
+
+        // ---- neck and head ----
+        part(K.skinShade, function () { roundRect(g, -1.4, -33 + by, 2.8, 2.6, 0.8); });
+        g.save();
+        g.translate(0, -37.5 + by);
+        drawPlayerHead(g, dir, pose, K.headR);
+        g.restore();
+
+        g.restore();
+    }
+
+    // The player's head, centered on (0, 0): messy black hair under a red
+    // cap worn backwards (strap and buckle at the front, brim at the back).
+    function drawPlayerHead(g, dir, pose, R) {
+        var K = LOOK;
+        var side = dir === 'left' || dir === 'right';
+        var happy = pose === 'cheer';
+
+        function part(color, path) {
+            g.beginPath();
+            path();
+            g.fillStyle = color;
+            g.fill();
+            g.strokeStyle = K.outline;
+            g.lineWidth = K.line;
+            g.stroke();
+        }
+
+        // ears (front and back views)
+        if (!side) {
+            part(K.skin, function () { g.arc(-R, 0.8, 1.5, 0, Math.PI * 2); });
+            part(K.skin, function () { g.arc(R, 0.8, 1.5, 0, Math.PI * 2); });
+        }
+
+        // head
+        part(dir === 'up' ? K.hair : K.skin, function () { g.arc(0, 0, R, 0, Math.PI * 2); });
+
+        // messy black hair (bangs over the forehead, longer at the sides)
+        if (dir === 'down') {
+            part(K.hair, function () {
+                g.moveTo(-R - 0.7, 2.4);
+                g.lineTo(-R - 0.7, -2);
+                g.arc(0, 0, R + 0.7, Math.PI + 0.3, -0.3);
+                g.lineTo(R + 0.7, 2.4);
+                g.lineTo(R - 0.8, 0.6);
+                g.lineTo(R * 0.55, -0.6);                                    // jagged bangs
+                g.lineTo(R * 0.3, 0.3);
+                g.lineTo(0.2, -1);
+                g.lineTo(-R * 0.3, 0.4);
+                g.lineTo(-R * 0.55, -0.8);
+                g.lineTo(-R + 0.8, 0.6);
+                g.closePath();
+            });
+        } else if (side) {
+            part(K.hair, function () {
+                g.arc(0, 0, R + 0.7, -0.3, Math.PI * 0.85, true);           // over the top to the back
+                g.lineTo(-R * 0.55, 2.8);                                    // down behind the ear
+                g.lineTo(-R * 0.4, -0.8);
+                g.lineTo(R * 0.25, -1.8);
+                g.lineTo(R * 0.55, -2.6);
+                g.lineTo(R * 0.98, -0.9);                                    // bangs flicking forward
+                g.closePath();
+            });
+            // ear, just in front of the hair (filled, thin edge, so it doesn't look like an eye)
+            g.fillStyle = K.skinShade;
+            g.beginPath();
+            g.ellipse(-R * 0.3, 1.7, 1.1, 1.5, 0, 0, Math.PI * 2);
+            g.fill();
+            g.lineWidth = 0.6;
+            g.strokeStyle = K.outline;
+            g.stroke();
+        } else {
+            // from behind: hair down to the neck, a few messy ends
+            part(K.hair, function () {
+                g.arc(0, 0, R + 0.6, Math.PI * 0.85, Math.PI * 0.15);
+                g.lineTo(R * 0.5, R + 0.4);
+                g.lineTo(R * 0.15, R - 0.6);
+                g.lineTo(-R * 0.2, R + 0.5);
+                g.lineTo(-R * 0.55, R - 0.4);
+                g.closePath();
+            });
+        }
+
+        // the cap: worn backwards, so the strap side faces the way he looks
+        if (side) {
+            // brim sticks out the back of the head
+            part(K.capShade, function () { g.ellipse(-R - 2, -2.2, 3.6, 1.2, -0.12, 0, Math.PI * 2); });
+        }
+        part(K.cap, function () {
+            g.arc(0, -0.8, R + 1, Math.PI + 0.32, -0.32);
+            g.closePath();
+        });
+        if (dir === 'up') {
+            // the brim points toward you
+            part(K.capShade, function () { g.ellipse(0, -2.6, R * 0.95, 2.2, 0, 0, Math.PI); });
+        } else if (side) {
+            // strap and buckle at the front edge
+            g.fillStyle = K.capStrap;
+            g.fillRect(R * 0.25, -4, R * 0.75, 1.3);
+            g.fillStyle = K.buckle;
+            g.fillRect(R * 0.55, -4.1, 1.2, 1.5);
+        } else {
+            // the opening at the back of the cap, with its strap and buckle
+            g.fillStyle = K.hair;
+            g.beginPath();
+            g.ellipse(0, -3.4, 2.6, 1.6, 0, Math.PI, 0);
+            g.fill();
+            g.fillStyle = K.capStrap;
+            g.fillRect(-3.4, -3.8, 6.8, 1.4);
+            g.fillStyle = K.buckle;
+            g.fillRect(-0.8, -4, 1.6, 1.8);
+        }
+        g.fillStyle = 'rgba(255, 255, 255, 0.22)';                           // shine on the cap
+        g.beginPath();
+        g.ellipse(-R * 0.35, -R * 0.75, 1.8, 0.9, -0.4, 0, Math.PI * 2);
+        g.fill();
+
+        if (dir === 'up') {
+            return;   // no face from behind
+        }
+
+        // face (from the side, everything sits toward the front: +x)
+        var ex1 = side ? R * 0.55 : -2.3;
+        var ex2 = side ? null : 2.3;
+
+        // eyebrows
+        g.strokeStyle = K.outline;
+        g.lineWidth = 1.1;
+        g.beginPath();
+        if (side) {
+            g.moveTo(R * 0.3, -0.4);
+            g.lineTo(R * 0.85, -0.2);
+        } else {
+            g.moveTo(-3.6, -0.2);
+            g.lineTo(-1.3, -0.5);
+            g.moveTo(1.3, -0.6);
+            g.lineTo(3.6, -0.1);
+        }
+        g.stroke();
+
+        // eyes (squinted when celebrating)
+        g.fillStyle = K.outline;
+        if (happy) {
+            g.lineWidth = 1;
+            g.beginPath();
+            g.moveTo(ex1 - 1, 1.6);
+            g.quadraticCurveTo(ex1, 0.6, ex1 + 1, 1.6);
+            if (ex2 !== null) {
+                g.moveTo(ex2 - 1, 1.6);
+                g.quadraticCurveTo(ex2, 0.6, ex2 + 1, 1.6);
+            }
+            g.stroke();
+        } else {
+            g.beginPath();
+            g.arc(ex1, 1.3, 0.85, 0, Math.PI * 2);
+            if (ex2 !== null) {
+                g.moveTo(ex2 + 0.85, 1.3);
+                g.arc(ex2, 1.3, 0.85, 0, Math.PI * 2);
+            }
+            g.fill();
+        }
+
+        // mouth: a cheeky teeth-showing face (a big grin when celebrating)
+        g.lineWidth = 0.8;
+        g.fillStyle = '#FFFFFF';
+        g.beginPath();
+        if (side) {
+            roundRect(g, R * 0.5, 3.4, 2.2, 1.2, 0.4);
+        } else if (happy) {
+            g.moveTo(-2.2, 3.2);
+            g.quadraticCurveTo(0, 6, 2.2, 3.2);
+            g.closePath();
+        } else {
+            roundRect(g, -1.7, 3.3, 3.4, 1.3, 0.5);
+        }
+        g.fill();
+        g.stroke();
+        g.lineWidth = K.line;
     }
 
     // A person seen from above: shoulders, then head with hair at the back
@@ -967,6 +1463,10 @@
         var len = dog ? 10 : 8;
 
         g.rotate(Math.atan2(faceY, faceX));   // now "forward" is +x
+        if (dog) {
+            drawMocha(g);
+            return;
+        }
         g.fillStyle = C.shadow;
         g.beginPath();
         g.ellipse(1, 3, len + 2, 5, 0, 0, Math.PI * 2);
@@ -1012,14 +1512,241 @@
         }
     }
 
+    // Mocha: a fluffy brown shih tzu seen from above, facing +x. Darker
+    // muzzle, black nose, dark eyes, long fluffy ears, a plumed tail curled
+    // over her back, and her pink tongue sticking out.
+    var MOCHA = {
+        fur: '#93613A',          // brown
+        furShade: '#5E3B20',     // the darker edge of the fluff (keeps her visible on wooden floors)
+        ears: '#6B4426',         // darker brown, long and floppy
+        muzzle: '#4F3626',
+        nose: '#1B1B1F',
+        eye: '#1B1B1F',
+        tongue: '#E0607A'
+    };
+
+    function drawMocha(g) {
+        var M = MOCHA;
+        var i, a;
+
+        // a fluffy blob: a ring of little puffs (darker edge first, then the fur on top)
+        function fluff(cx, cy, rx, ry, puffs, r) {
+            [[M.furShade, r + 0.6], [M.fur, r]].forEach(function (layer) {
+                g.fillStyle = layer[0];
+                for (i = 0; i < puffs; i++) {
+                    a = Math.PI * 2 * i / puffs;
+                    g.beginPath();
+                    g.arc(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, layer[1], 0, Math.PI * 2);
+                    g.fill();
+                }
+                g.beginPath();
+                g.ellipse(cx, cy, rx + layer[1] * 0.3, ry + layer[1] * 0.3, 0, 0, Math.PI * 2);
+                g.fill();
+            });
+        }
+
+        g.fillStyle = C.shadow;
+        g.beginPath();
+        g.ellipse(1, 3, 12, 6, 0, 0, Math.PI * 2);
+        g.fill();
+
+        fluff(-2, 0, 6.5, 4.6, 12, 2.4);                // body
+
+        // tail: a fluffy plume curled up over her back
+        [[-9.5, 0.5, 2.6], [-9, -2.6, 2.4], [-6.8, -4.2, 2.2]].forEach(function (p) {
+            g.fillStyle = M.furShade;
+            g.beginPath();
+            g.arc(p[0], p[1], p[2] + 0.6, 0, Math.PI * 2);
+            g.fill();
+        });
+        [[-9.5, 0.5, 2.6], [-9, -2.6, 2.4], [-6.8, -4.2, 2.2]].forEach(function (p) {
+            g.fillStyle = M.fur;
+            g.beginPath();
+            g.arc(p[0], p[1], p[2], 0, Math.PI * 2);
+            g.fill();
+        });
+
+        fluff(6.6, 0, 3.2, 3.2, 9, 1.9);               // head
+
+        // long fluffy ears hanging down the sides of her head
+        g.fillStyle = M.ears;
+        [-1, 1].forEach(function (s) {
+            g.beginPath();
+            g.ellipse(5, s * 4.4, 4, 2.3, s * 0.3, 0, Math.PI * 2);
+            g.fill();
+            g.beginPath();                                // fluffy tip
+            g.arc(2.4, s * 5.4, 1.8, 0, Math.PI * 2);
+            g.fill();
+        });
+
+        // grey-beige muzzle, black nose, pink tongue out
+        g.fillStyle = M.tongue;
+        g.beginPath();
+        g.ellipse(11.6, 0.6, 1.9, 1.3, 0.2, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = M.muzzle;
+        g.beginPath();
+        g.ellipse(9.4, 0, 2.5, 2.7, 0, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = M.nose;
+        g.beginPath();
+        g.ellipse(10.9, 0, 1.2, 1.5, 0, 0, Math.PI * 2);
+        g.fill();
+
+        // dark round eyes with a little shine
+        [-2.4, 2.4].forEach(function (ey) {
+            g.fillStyle = M.eye;
+            g.beginPath();
+            g.arc(7.6, ey, 1, 0, Math.PI * 2);
+            g.fill();
+            g.fillStyle = '#ffffff';
+            g.beginPath();
+            g.arc(7.9, ey - 0.3, 0.3, 0, Math.PI * 2);
+            g.fill();
+        });
+    }
+
     // A ring around the item you can grab (pulses gently, unless reduced motion is on)
     function drawHighlight(it) {
         var pulse = reducedMotion.matches ? 0 : Math.sin(clock * 5) * 2;
-        ctx.strokeStyle = '#ffd34d';
-        ctx.lineWidth = 2.5;
+        // soft glow under the item, then a dark + yellow ring so it shows on any floor
+        ctx.fillStyle = 'rgba(255, 211, 77, 0.28)';
         ctx.beginPath();
-        ctx.arc(it.x, it.y, 16 + pulse, 0, Math.PI * 2);
+        ctx.arc(it.x, it.y, 17 + pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(28, 20, 5, 0.6)';
+        ctx.lineWidth = 5;
         ctx.stroke();
+        ctx.strokeStyle = '#ffd34d';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+
+    // A name tag over the item you'd pick up: "SPACE Lola" (or "Grab Lola" on phones),
+    // with a little arrow pointing at it. Drawn last, so nothing covers it.
+    function drawPickLabel(it) {
+        var keyText = touchScreen.matches ? 'Grab' : 'SPACE';
+        var name = it.def.name;
+        var bounce = reducedMotion.matches ? 0 : Math.abs(Math.sin(clock * 4)) * 3;
+
+        ctx.font = '800 15px "Baloo 2", system-ui, sans-serif';
+        var keyW = ctx.measureText(keyText).width + 10;
+        ctx.font = '800 17px "Baloo 2", system-ui, sans-serif';
+        var nameW = ctx.measureText(name).width;
+        var h = 26;
+        var w = keyW + nameW + 18;
+
+        // above the item, unless that would go off the top of the house (then below)
+        var above = it.y - 26 - h - bounce > 0;
+        var tipY = above ? it.y - 20 - bounce : it.y + 20 + bounce;
+        var boxY = above ? tipY - 7 - h : tipY + 7;
+        var boxX = Math.max(4, Math.min(cols * TILE - w - 4, it.x - w / 2));
+
+        // arrow pointing at the item
+        ctx.fillStyle = '#1c1405';
+        ctx.beginPath();
+        ctx.moveTo(it.x - 7, above ? tipY - 8 : tipY + 8);
+        ctx.lineTo(it.x + 7, above ? tipY - 8 : tipY + 8);
+        ctx.lineTo(it.x, tipY);
+        ctx.closePath();
+        ctx.fill();
+
+        // the tag: dark box, yellow key chip, white name
+        ctx.fillStyle = 'rgba(16, 26, 38, 0.92)';
+        roundRect(ctx, boxX, boxY, w, h, 8);
+        ctx.fill();
+        ctx.strokeStyle = '#ffd34d';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffd34d';
+        roundRect(ctx, boxX + 5, boxY + 4, keyW, h - 8, 5);
+        ctx.fill();
+
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#1c1405';
+        ctx.font = '800 15px "Baloo 2", system-ui, sans-serif';
+        ctx.fillText(keyText, boxX + 10, boxY + h / 2 + 1);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '800 17px "Baloo 2", system-ui, sans-serif';
+        ctx.fillText(name, boxX + keyW + 11, boxY + h / 2 + 1);
+    }
+
+    // A random line from js/lines.js for this item (or from "any"); empty lines are skipped
+    function pickLine(type) {
+        var all = window.BAHA_LINES || {};
+        var clean = function (list) {
+            return (list || []).filter(function (l) { return typeof l === 'string' && l.trim() !== ''; });
+        };
+        var lines = clean(all[type]);
+        if (!lines.length) {
+            lines = clean(all.any);
+        }
+        return lines.length ? lines[Math.floor(Math.random() * lines.length)].trim() : '';
+    }
+
+    // The player's speech bubble, above his head (it follows him while it's up)
+    function drawSpeech() {
+        if (!speech) {
+            return;
+        }
+        var fadeIn = reducedMotion.matches ? 1 : Math.min(1, speech.age / 0.15);
+        var fadeOut = Math.min(1, (SPEECH_TIME - speech.age) / 0.4);
+        ctx.globalAlpha = Math.max(0, Math.min(fadeIn, fadeOut));
+
+        ctx.font = '800 16px "Baloo 2", system-ui, sans-serif';
+        var maxW = cols * TILE - 16;
+        var lines = wrapSpeech(speech.text);
+        var textW = 0;
+        lines.forEach(function (l) { textW = Math.max(textW, ctx.measureText(l).width); });
+        textW = Math.min(textW, maxW - 20);
+        var w = textW + 20;
+        var lineH = 18;
+        var h = 10 + lines.length * lineH;
+        var tipX = player.x + 4;
+        var tipY = Math.max(h + 10, player.y - 40);          // just above his cap (stays inside the house)
+        var boxX = Math.max(4, Math.min(cols * TILE - w - 4, tipX - w / 2));
+        var boxY = tipY - 8 - h;
+
+        // bubble with a little tail pointing at him
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#1B1B1F';
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
+        roundRect(ctx, boxX, boxY, w, h, 10);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(tipX - 6, boxY + h - 1);
+        ctx.lineTo(tipX, tipY);
+        ctx.lineTo(tipX + 6, boxY + h - 1);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillRect(tipX - 5, boxY + h - 3, 10, 3);         // hide the box's edge where the tail joins
+
+        ctx.fillStyle = '#1B1B1F';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        lines.forEach(function (l, i) {
+            ctx.fillText(l, boxX + w / 2, boxY + 5 + lineH * (i + 0.5) + 1, maxW - 20);
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    // Long lines (over about 26 letters) are split in two at the space nearest the middle
+    function wrapSpeech(text) {
+        if (text.length <= 26) {
+            return [text];
+        }
+        var mid = text.length / 2;
+        var best = -1;
+        for (var i = 0; i < text.length; i++) {
+            if (text.charAt(i) === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) {
+                best = i;
+            }
+        }
+        return best < 0 ? [text] : [text.slice(0, best), text.slice(best + 1)];
     }
 
     function drawToasts() {
@@ -1044,8 +1771,13 @@
        ----------------------------------------------------------------- */
     function update(dt) {
         clock += dt;
+        player.cheer = Math.max(0, player.cheer - dt);
         toasts.forEach(function (t) { t.age += dt; });
         toasts = toasts.filter(function (t) { return t.age < 1.8; });
+        if (speech) {
+            speech.age += dt;
+            if (speech.age > SPEECH_TIME) { speech = null; }
+        }
         if (banner) {
             banner.age += dt;
             if (banner.age > 3.2) { banner = null; }
@@ -1257,16 +1989,21 @@
     function saveCarried() {
         var it = carrying;
         it.state = 'saved';
+        player.cheer = CHEER_TIME;   // he pumps his fist
         carrying = null;
         score += it.def.points;
+        var line = pickLine(it.type);
+        if (line) {
+            speech = { text: line, age: 0 };
+        }
         toasts.push({ text: '+' + it.def.points + ' ' + it.def.name, x: stairsCenter.x, y: stairsCenter.y - 10, age: 0 });
 
         if (remaining() === 0) {
             toasts.push({ text: 'Everyone is safe!', x: stairsCenter.x, y: stairsCenter.y + 14, age: -0.6 });
-            announce(it.def.name + ' is safe upstairs. Nothing is left downstairs!');
+            announce(it.def.name + ' is safe upstairs. Nothing is left downstairs!' + (line ? ' You say: ' + line : ''));
             finishIn = 1.6;   // the timer stops here; the end screen comes up shortly
         } else {
-            announce(it.def.name + ' is safe upstairs. Plus ' + it.def.points + ' points.');
+            announce(it.def.name + ' is safe upstairs. Plus ' + it.def.points + ' points.' + (line ? ' You say: ' + line : ''));
         }
         updateHud();
     }
@@ -1687,7 +2424,9 @@
         state: function () {
             return { mode: mode, player: player, items: items, carrying: carrying, nearby: nearby, score: score,
                 elapsed: elapsed, phase: phase, water: water, levelIndex: levelIndex, level: level };
-        }
+        },
+        drawPlayer: drawPlayerSprite,
+        drawItem: drawItem
     };
 
     // Show the first house behind the title screen, list the houses, then start the loop

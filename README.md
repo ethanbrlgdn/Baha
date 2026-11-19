@@ -49,4 +49,5 @@ finish early), stars, and real flood-safety tips.
 | `index.html` | The page: top bar, game canvas, title/pause/end screens, phone buttons |
 | `css/style.css` | Colors, layout, rain background, buttons, house cards |
 | `js/levels.js` | The three houses drawn as text (one character per tile), with items and timings |
+| `js/lines.js` | What the player says in a speech bubble when he saves someone or something |
 | `js/game.js` | Drawing, movement, items, water and timer, end screen, high scores, controls |
