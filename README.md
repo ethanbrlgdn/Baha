@@ -22,6 +22,16 @@ hosted on GitHub Pages as a static site.
 Carry one thing at a time onto the stairs to save it. Heavy things (the ref, the TV,
 the rice) slow you down, and Lola and Lolo walk slowly.
 
+You have 2 minutes, following PAGASA's rainfall warning colors:
+
+- **Yellow:** flooding is possible. Move things upstairs while it's dry.
+- **Orange:** the water comes in and rises, and you walk slower.
+- **Red:** the water ruins everything left on the floor. Get your family and pets upstairs
+  before time runs out!
+
+The end screen shows what you saved and lost, your score (plus a time bonus if you
+finish early), stars, and real flood-safety tips.
+
 ## Files
 
 | File | What it does |

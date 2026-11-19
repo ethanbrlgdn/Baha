@@ -115,6 +115,50 @@ button {
     font-weight: 700;
 }
 
+/* PAGASA warning color and time left */
+.hud-warning {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0 0 0 auto;
+}
+
+.warn-badge {
+    min-width: 72px;
+    padding: var(--space-1) var(--space-3);
+    border-radius: 999px;
+    background: #f5d33d;
+    color: #1c1405;
+    font-family: var(--font-display);
+    font-weight: 800;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.hud-timer {
+    min-width: 3.2em;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.4rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.hud-timer.is-urgent {
+    color: #ff8a7a;   /* 6.9:1 on --night-800 */
+}
+
+.hud-warning + .icon-btn {
+    margin-left: 0;
+}
+
+/* on narrow phones there's no room for the level name */
+@media (max-width: 480px) {
+    .hud-level {
+        display: none;
+    }
+}
+
 .icon-btn {
     display: grid;
     place-items: center;
@@ -217,6 +261,89 @@ button {
 .key-hint {
     color: var(--text);
     font-weight: 700;
+}
+
+/* ---- End screen ---- */
+.overlay-page {
+    position: fixed;
+    z-index: 10;
+    place-items: start center;
+    padding: var(--space-5) var(--space-4);
+    background: rgba(8, 16, 25, 0.92);
+}
+
+.panel-wide {
+    width: min(100%, 560px);
+}
+
+.end-sub {
+    margin: 0;
+    color: var(--text-muted);
+}
+
+.end-stars {
+    margin: var(--space-3) 0 0;
+    font-size: 2.6rem;
+    line-height: 1;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+}
+
+.end-score {
+    margin: var(--space-2) 0 0;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.8rem;
+}
+
+.end-breakdown {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.end-lists {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+    margin-top: var(--space-5);
+    text-align: left;
+}
+
+.end-lists h3,
+.tips h3 {
+    margin: 0 0 var(--space-1);
+    font-size: 1rem;
+}
+
+.end-lists ul,
+.tips ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    color: var(--text-muted);
+}
+
+.end-lists li.is-family {
+    color: var(--text);
+    font-weight: 700;
+}
+
+.end-rules {
+    margin: var(--space-4) 0 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-align: left;
+}
+
+.tips {
+    margin: var(--space-4) 0 var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+    text-align: left;
+}
+
+.tips li + li {
+    margin-top: var(--space-2);
 }
 
 /* ---- Buttons ---- */

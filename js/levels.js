@@ -13,6 +13,9 @@
    (lola, lolo, bunso, nene, dog, cat, documents, rice, water,
    flashlight, radio, tv, ref, fan). col/row is the item's center,
    so 4.5 means "the middle of column 4". Put them on floor tiles.
+   time = seconds of each PAGASA warning. Yellow: no water yet.
+   Orange: water comes in. Red: things left on the floor are ruined,
+   and when Red ends the ground floor is flooded (game over).
    ===================================================================== */
 window.BAHA_LEVELS = [
     {
@@ -32,6 +35,7 @@ window.BAHA_LEVELS = [
             '#####w###FF###w#####'
         ],
         spawn: { col: 10, row: 8.6 },
+        time: { yellow: 40, orange: 40, red: 40 },
         labels: [
             { text: 'Kwarto', col: 3.5, row: 4.4 },
             { text: 'Sala', col: 10, row: 2 },

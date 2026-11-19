@@ -4,6 +4,9 @@
    keyboard or the phone buttons, bump into walls and furniture.
    Step 2: pick up family, pets and belongings (one at a time) and
    carry them to the stairs. Heavy things slow you down.
+   Step 3: a timer with PAGASA warnings (Yellow -> Orange -> Red),
+   rising water that slows you, things ruined at Red, and an end
+   screen with what was saved/lost, score, stars and safety tips.
    ===================================================================== */
 (function () {
     'use strict';
@@ -13,6 +16,33 @@
     var PLAYER_RADIUS = 10;
     var PLAYER_SPEED = 130;     // pixels per second
     var GRAB_RANGE = 30;        // how close (pixels) you must be to pick something up
+    var WATER_SLOW = 0.35;      // at full depth, water takes away 35% of your speed
+    var TIME_BONUS = 5;         // points per second left, if you finish early with all the family safe
+
+    // PAGASA rainfall warning colors. text = a readable text color on that background.
+    var PHASES = [
+        { name: 'Yellow', color: '#f5d33d', text: '#1c1405',
+          message: 'Yellow warning: flooding is possible. Move things upstairs!' },
+        { name: 'Orange', color: '#f08a24', text: '#1c1405',
+          message: 'Orange warning: the water is coming in!' },
+        { name: 'Red', color: '#d93a2b', text: '#ffffff',
+          message: 'Red warning: serious flooding! Get your family upstairs!' }
+    ];
+
+    // Real flood-safety advice (PAGASA, NDRRMC and DOH), shown on the end screen
+    var TIPS = [
+        'Know the PAGASA rainfall warnings. Yellow: flooding is possible, keep watching the news. ' +
+            'Orange: flooding is threatening, get ready to leave. Red: serious flooding, evacuate.',
+        'Prepare a go-bag before typhoon season: water, food, flashlight, radio, medicine, and copies ' +
+            'of important documents in a waterproof bag.',
+        'Move appliances and valuables to a higher place early, before the rain gets heavy.',
+        'Turn off the main power switch before the water comes in, and never touch electrical things ' +
+            'while you are wet or standing in water.',
+        'Do not walk through moving floodwater: water only ankle- to knee-deep can knock you over. ' +
+            'If your barangay tells you to evacuate, go right away.',
+        'Floodwater can carry leptospirosis. Wear boots, and see a doctor if you waded in a flood, ' +
+            'especially with a wound.'
+    ];
 
     // ---- Things to save ----
     // group: family must all be saved; the rest are worth points.
@@ -84,6 +114,10 @@
     var grabBtn = document.getElementById('grab-btn');
     var grabMain = document.getElementById('grab-main');
     var grabSub = document.getElementById('grab-sub');
+    var hudWarning = document.getElementById('hud-warning');
+    var warnBadge = document.getElementById('warn-badge');
+    var hudTimer = document.getElementById('hud-timer');
+    var endScreen = document.getElementById('end-screen');
 
     var reducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
     var touchScreen = window.matchMedia ? window.matchMedia('(pointer: coarse)') : { matches: false };
@@ -105,6 +139,14 @@
     var toasts = [];             // floating "+50" messages: { text, x, y, age }
     var clock = 0;               // seconds of play, for the pulsing highlight
     var stairsCenter = { x: 0, y: 0 };
+
+    var elapsed = 0;             // seconds since the game started (stops while paused)
+    var phaseEnds = [];          // when Yellow, Orange and Red end, in seconds
+    var phase = 0;               // 0 = Yellow, 1 = Orange, 2 = Red
+    var water = 0;               // water depth, 0 (dry) to 1 (knee-deep)
+    var waterTiles = [];         // floor tiles the water covers (everything but walls and stairs)
+    var banner = null;           // big message at the top: { text, color, textColor, age }
+    var finishIn = -1;           // counts down to the end screen once everything is safe
 
     // Which directions are held down (keyboard and touch buttons both set these)
     var held = { up: false, down: false, left: false, right: false };
@@ -161,6 +203,25 @@
             }
         }
         stairsCenter = { x: (n ? sx / n : cols / 2) * TILE, y: (n ? sy / n : rows / 2) * TILE };
+
+        waterTiles = [];
+        for (r = 0; r < rows; r++) {
+            for (c = 0; c < cols; c++) {
+                var ch = tileAt(c, r);
+                if (ch !== '#' && ch !== 'w' && ch !== 'F' && ch !== 'S') {
+                    waterTiles.push([c, r]);
+                }
+            }
+        }
+
+        var t = level.time || { yellow: 40, orange: 40, red: 40 };
+        phaseEnds = [t.yellow, t.yellow + t.orange, t.yellow + t.orange + t.red];
+        elapsed = 0;
+        phase = 0;
+        water = 0;
+        banner = null;
+        finishIn = -1;
+        updateClock();
 
         hudLevel.textContent = level.name;
         updateHud();
@@ -419,6 +480,8 @@
             .sort(function (a, b) { return a.y - b.y; })
             .forEach(function (it) { drawItem(ctx, it.type, it.x, it.y, 0, 1, 1); });
 
+        drawWater();
+
         if (nearby && mode === 'playing') {
             drawHighlight(nearby);
         }
@@ -438,6 +501,42 @@
         }
 
         drawToasts();
+        drawBanner();
+    }
+
+    // Brown-blue floodwater over the ground floor (the stairs stay dry), with gentle ripples
+    function drawWater() {
+        if (water <= 0) {
+            return;
+        }
+        ctx.fillStyle = 'rgba(70, 110, 130, ' + (0.2 + water * 0.45).toFixed(3) + ')';
+        waterTiles.forEach(function (t) {
+            ctx.fillRect(t[0] * TILE, t[1] * TILE, TILE, TILE);
+        });
+
+        ctx.fillStyle = 'rgba(220, 240, 250, ' + (0.15 + water * 0.2).toFixed(3) + ')';
+        waterTiles.forEach(function (t) {
+            if ((t[0] * 7 + t[1] * 3) % 4 !== 0) { return; }   // ripples on some tiles only
+            var drift = reducedMotion.matches ? 0 : Math.sin(clock * 1.6 + t[0] * 0.9 + t[1] * 1.7) * 4;
+            ctx.fillRect(t[0] * TILE + 8 + drift, t[1] * TILE + 14, 12, 2);
+        });
+    }
+
+    // The big warning message across the top when the PAGASA color changes
+    function drawBanner() {
+        if (!banner) {
+            return;
+        }
+        var w = cols * TILE;
+        ctx.globalAlpha = Math.max(0, Math.min(1, (3.2 - banner.age) / 0.5));
+        ctx.fillStyle = banner.color;
+        ctx.fillRect(0, 10, w, 40);
+        ctx.fillStyle = banner.textColor;
+        ctx.font = '800 20px "Baloo 2", system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(banner.text, w / 2, 31, w - 24);
+        ctx.globalAlpha = 1;
     }
 
     // A person seen from above: shoulders, then head with hair at the back
@@ -731,6 +830,22 @@
         clock += dt;
         toasts.forEach(function (t) { t.age += dt; });
         toasts = toasts.filter(function (t) { return t.age < 1.8; });
+        if (banner) {
+            banner.age += dt;
+            if (banner.age > 3.2) { banner = null; }
+        }
+
+        // everything is safe: wait a moment (so you see the "+points"), then show the end screen
+        if (finishIn >= 0) {
+            finishIn -= dt;
+            if (finishIn < 0) { endGame(); }
+            return;
+        }
+
+        updateTime(dt);
+        if (mode !== 'playing') {
+            return;   // time ran out
+        }
 
         movePlayer(dt);
 
@@ -763,7 +878,7 @@
         player.faceY = dy;
         player.walkTime += dt;
 
-        var step = PLAYER_SPEED * (carrying ? carrying.def.speed : 1) * dt;
+        var step = PLAYER_SPEED * (carrying ? carrying.def.speed : 1) * (1 - water * WATER_SLOW) * dt;
 
         // move sideways and up/down separately, so you slide along walls
         var nx = player.x + dx * step;
@@ -777,8 +892,89 @@
     }
 
     /* -----------------------------------------------------------------
+       TIME, PAGASA WARNINGS AND WATER
+       ----------------------------------------------------------------- */
+    function updateTime(dt) {
+        elapsed += dt;
+
+        var newPhase = elapsed < phaseEnds[0] ? 0 : (elapsed < phaseEnds[1] ? 1 : 2);
+        if (newPhase !== phase) {
+            phase = newPhase;
+            showBanner();
+            if (phase === 2) {
+                ruinFloorThings();
+            }
+        }
+
+        // Yellow: dry. Orange: rises to ankle-deep (0.45). Red: rises to knee-deep (1).
+        if (phase === 0) {
+            water = 0;
+        } else if (phase === 1) {
+            water = 0.45 * (elapsed - phaseEnds[0]) / (phaseEnds[1] - phaseEnds[0]);
+        } else {
+            water = 0.45 + 0.55 * Math.min(1, (elapsed - phaseEnds[1]) / (phaseEnds[2] - phaseEnds[1]));
+        }
+
+        var left = Math.ceil(phaseEnds[2] - elapsed);
+        if (left === 10 && !updateTime.warned10) {
+            updateTime.warned10 = true;
+            announce('10 seconds left!');
+        }
+        if (left > 10) {
+            updateTime.warned10 = false;
+        }
+
+        updateClock();
+
+        if (elapsed >= phaseEnds[2]) {
+            endGame();
+        }
+    }
+
+    function showBanner() {
+        var p = PHASES[phase];
+        banner = { text: p.message, color: p.color, textColor: p.text, age: 0 };
+        announce(p.message);
+    }
+
+    // At Red, the water ruins every object still on the floor. Family and pets can still be saved.
+    function ruinFloorThings() {
+        var ruined = items.filter(function (it) { return it.state === 'home' && !isAlive(it.def); });
+        ruined.forEach(function (it) {
+            it.state = 'lost';
+            toasts.push({ text: 'Ruined!', x: it.x, y: it.y, age: 0 });
+        });
+        if (ruined.length) {
+            announce(PHASES[2].message + ' The water ruined ' + ruined.length + ' things on the floor.');
+        }
+        if (nearby && nearby.state === 'lost') {
+            nearby = null;
+        }
+        if (remaining() === 0) {
+            finishIn = 1.6;
+        }
+        updateHud();
+    }
+
+    // The timer and the PAGASA badge in the top bar
+    function updateClock() {
+        var left = Math.max(0, Math.ceil(phaseEnds[2] - elapsed));
+        var p = PHASES[phase];
+        setText(hudTimer, Math.floor(left / 60) + ':' + ('0' + (left % 60)).slice(-2));
+        setText(warnBadge, p.name);
+        warnBadge.style.background = p.color;
+        warnBadge.style.color = p.text;
+        hudTimer.classList.toggle('is-urgent', left <= 10);
+    }
+
+    /* -----------------------------------------------------------------
        ITEMS: grab, carry, drop, save
        ----------------------------------------------------------------- */
+    // Things that are still downstairs (on the floor or in your hands)
+    function remaining() {
+        return items.filter(function (i) { return i.state === 'home' || i.state === 'carried'; }).length;
+    }
+
     // Is any part of the player standing on a stair tile?
     function onStairs() {
         var r = PLAYER_RADIUS - 1;
@@ -849,10 +1045,10 @@
         score += it.def.points;
         toasts.push({ text: '+' + it.def.points + ' ' + it.def.name, x: stairsCenter.x, y: stairsCenter.y - 10, age: 0 });
 
-        var left = items.filter(function (i) { return i.state !== 'saved'; }).length;
-        if (left === 0) {
-            toasts.push({ text: 'Everything is safe!', x: stairsCenter.x, y: stairsCenter.y + 14, age: -0.6 });
-            announce(it.def.name + ' is safe upstairs. Everything is safe upstairs!');
+        if (remaining() === 0) {
+            toasts.push({ text: 'Everyone is safe!', x: stairsCenter.x, y: stairsCenter.y + 14, age: -0.6 });
+            announce(it.def.name + ' is safe upstairs. Nothing is left downstairs!');
+            finishIn = 1.6;   // the timer stops here; the end screen comes up shortly
         } else {
             announce(it.def.name + ' is safe upstairs. Plus ' + it.def.points + ' points.');
         }
@@ -875,7 +1071,7 @@
     function updateHud() {
         var family = items.filter(function (i) { return i.def.group === 'family'; });
         var familySaved = family.filter(function (i) { return i.state === 'saved'; }).length;
-        var left = items.filter(function (i) { return i.state !== 'saved'; }).length;
+        var left = remaining();
         var press = touchScreen.matches ? 'Tap Grab' : 'Press Space';
 
         var hint;
@@ -884,7 +1080,9 @@
         } else if (nearby) {
             hint = press + ' to pick up ' + nearby.def.name + '.';
         } else if (left === 0) {
-            hint = 'Everyone and everything is safe upstairs!';
+            hint = 'Nothing is left downstairs!';
+        } else if (phase === 2) {
+            hint = 'The water ruined what was on the floor. Save your family and pets! ' + left + ' left.';
         } else {
             hint = 'Find your family, pets and things. ' + left + ' left downstairs.';
         }
@@ -918,9 +1116,116 @@
     function startGame() {
         loadLevel(window.BAHA_LEVELS[0]);
         titleScreen.hidden = true;
+        endScreen.hidden = true;
         pauseBtn.hidden = false;
+        hudWarning.hidden = false;
         mode = 'playing';
+        showBanner();
         canvas.focus();
+    }
+
+    /* -----------------------------------------------------------------
+       THE END: what was saved and lost, score, stars, tips
+       ----------------------------------------------------------------- */
+    function endGame() {
+        if (mode === 'ended') {
+            return;
+        }
+        var timeLeft = Math.max(0, phaseEnds[2] - elapsed);
+
+        // the ground floor is flooded: whatever is still downstairs is lost
+        items.forEach(function (it) {
+            if (it.state === 'home' || it.state === 'carried') { it.state = 'lost'; }
+        });
+        carrying = null;
+        nearby = null;
+        mode = 'ended';
+        releaseAll();
+        pauseBtn.hidden = true;
+
+        var saved = items.filter(function (i) { return i.state === 'saved'; });
+        var lost = items.filter(function (i) { return i.state === 'lost'; });
+        var familyLost = lost.filter(function (i) { return i.def.group === 'family'; });
+        var familySafe = familyLost.length === 0;
+
+        // stars: 1 for the whole family, then 2 and 3 for how much of the rest you saved
+        var otherMax = 0, otherSaved = 0;
+        items.forEach(function (i) {
+            if (i.def.group === 'family') { return; }
+            otherMax += i.def.points;
+            if (i.state === 'saved') { otherSaved += i.def.points; }
+        });
+        var share = otherMax ? otherSaved / otherMax : 1;
+        var stars = !familySafe ? 0 : (share >= 0.8 ? 3 : (share >= 0.5 ? 2 : 1));
+
+        var bonus = familySafe ? Math.floor(timeLeft) * TIME_BONUS : 0;
+        var total = score + bonus;
+
+        // fill in the end screen
+        setText(document.getElementById('end-heading'), familySafe ? 'Ligtas ang pamilya!' : 'Hindi lahat nakaligtas...');
+        setText(document.getElementById('end-sub'), familySafe ?
+            'Your whole family made it upstairs.' :
+            listNames(familyLost) + (familyLost.length > 1 ? ' were' : ' was') + ' left downstairs. Family comes first: try again!');
+
+        var starEl = document.getElementById('end-stars');
+        setText(starEl, '★★★'.slice(0, stars) + '☆☆☆'.slice(0, 3 - stars));
+        starEl.setAttribute('aria-label', stars + ' of 3 stars');
+
+        setText(document.getElementById('end-score'), 'Score ' + total);
+        setText(document.getElementById('end-breakdown'), score + ' for what you saved' +
+            (bonus ? ' + ' + bonus + ' time bonus (' + Math.floor(timeLeft) + 's left)' : ''));
+
+        fillList('end-saved', saved, 'Nothing', true);
+        fillList('end-lost', lost, 'Nothing. Great job!', false);
+        fillTips(lost);
+
+        endScreen.hidden = false;
+        announce((familySafe ? 'Your whole family is safe. ' : 'Not everyone made it. ') +
+            'Score ' + total + ', ' + stars + ' of 3 stars.');
+        document.getElementById('again-btn').focus();
+    }
+
+    function listNames(list) {
+        var names = list.map(function (i) { return i.def.name; });
+        if (names.length <= 1) { return names.join(''); }
+        return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    }
+
+    function fillList(id, list, emptyText, withPoints) {
+        var ul = document.getElementById(id);
+        ul.textContent = '';
+        if (!list.length) {
+            var none = document.createElement('li');
+            none.textContent = emptyText;
+            ul.appendChild(none);
+            return;
+        }
+        list.forEach(function (it) {
+            var li = document.createElement('li');
+            li.textContent = it.def.name + (withPoints ? ' (+' + it.def.points + ')' : '');
+            if (it.def.group === 'family') { li.className = 'is-family'; }
+            ul.appendChild(li);
+        });
+    }
+
+    // Three tips: the PAGASA colors, then ones that match what you lost, then a random one
+    function fillTips(lost) {
+        var picks = [0];
+        var lostGroup = function (g) { return lost.some(function (i) { return i.def.group === g; }); };
+        if (lostGroup('important') || lostGroup('supplies')) { picks.push(1); }
+        if (lostGroup('appliance')) { picks.push(2); }
+        var others = [3, 4, 5, 1, 2].filter(function (n) { return picks.indexOf(n) < 0; });
+        while (picks.length < 3) {
+            picks.push(others.splice(Math.floor(Math.random() * others.length), 1)[0]);
+        }
+
+        var ul = document.getElementById('end-tips');
+        ul.textContent = '';
+        picks.forEach(function (n) {
+            var li = document.createElement('li');
+            li.textContent = TIPS[n];
+            ul.appendChild(li);
+        });
     }
 
     function pause() {
@@ -1029,6 +1334,7 @@
        ----------------------------------------------------------------- */
     document.getElementById('start-btn').addEventListener('click', startGame);
     document.getElementById('resume-btn').addEventListener('click', resume);
+    document.getElementById('again-btn').addEventListener('click', startGame);
     pauseBtn.addEventListener('click', pause);
 
     // Switching tabs or apps pauses the game, and lets go of every key
@@ -1057,7 +1363,8 @@
     // Lets the automated check (a test script run with Node) look inside the game
     window.BAHA_TEST = {
         state: function () {
-            return { mode: mode, player: player, items: items, carrying: carrying, nearby: nearby, score: score };
+            return { mode: mode, player: player, items: items, carrying: carrying, nearby: nearby, score: score,
+                elapsed: elapsed, phase: phase, water: water };
         }
     };
 

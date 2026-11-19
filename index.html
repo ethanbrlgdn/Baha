@@ -17,10 +17,16 @@
 
 <body>
     <main class="shell">
-        <!-- TOP BAR: level name, and (from step 3) the timer and PAGASA warning -->
+        <!-- TOP BAR: level name, PAGASA warning color, time left, pause -->
         <header class="hud">
             <h1 class="hud-title">Baha!</h1>
             <p class="hud-level" id="hud-level">Two-Storey House</p>
+            <p class="hud-warning" id="hud-warning" hidden>
+                <span class="sr-only">PAGASA warning:</span>
+                <span class="warn-badge" id="warn-badge">Yellow</span>
+                <span class="sr-only">Time left:</span>
+                <span class="hud-timer" id="hud-timer">2:00</span>
+            </p>
             <button type="button" class="icon-btn" id="pause-btn" aria-label="Pause game" hidden>
                 <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M8 5v14M16 5v14" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg>
             </button>
@@ -46,6 +52,7 @@
                             <li><span class="key-hint">Move:</span> arrow keys or WASD (on phones, the buttons below)</li>
                             <li><span class="key-hint">Grab / drop:</span> Space or E (on phones, the Grab button)</li>
                             <li><span class="key-hint">Save it:</span> carry it onto the stairs (UP). One thing at a time, and heavy things slow you down!</li>
+                            <li><span class="key-hint">Watch the warning:</span> Yellow, then Orange (water comes in), then Red: the water ruins everything left on the floor. Get your whole family upstairs before time runs out!</li>
                             <li><span class="key-hint">Pause:</span> P or Esc</li>
                         </ul>
                     </div>
@@ -60,6 +67,37 @@
                 </div>
             </section>
         </div>
+
+        <!-- End screen (covers the whole page, so it's easy to read on phones) -->
+        <section class="overlay overlay-page" id="end-screen" aria-labelledby="end-heading" hidden>
+            <div class="panel panel-wide">
+                <h2 id="end-heading">Ligtas ang pamilya!</h2>
+                <p class="end-sub" id="end-sub"></p>
+                <p class="end-stars" id="end-stars" role="img" aria-label="0 of 3 stars"></p>
+                <p class="end-score" id="end-score"></p>
+                <p class="end-breakdown" id="end-breakdown"></p>
+
+                <div class="end-lists">
+                    <div>
+                        <h3>Saved</h3>
+                        <ul id="end-saved"></ul>
+                    </div>
+                    <div>
+                        <h3>Lost</h3>
+                        <ul id="end-lost"></ul>
+                    </div>
+                </div>
+                <p class="end-rules">Stars: 1 for saving the whole family, 2 for also saving half of the pets and
+                    things (by points), 3 for 80%.</p>
+
+                <div class="tips">
+                    <h3>Flood safety tips</h3>
+                    <ul id="end-tips"></ul>
+                </div>
+
+                <button type="button" class="btn btn-primary" id="again-btn">Play again</button>
+            </div>
+        </section>
 
         <!-- STATUS: what you're carrying or can grab, family saved, score -->
         <div class="status">
