@@ -1,0 +1,325 @@
+/* =====================================================================
+   BAHA! styles
+   Stormy night outside, warm house inside. Colors are tokens so they
+   can be changed in one place.
+   ===================================================================== */
+:root {
+    --night-900: #0b1622;
+    --night-800: #0f1d2b;
+    --night-700: #172a3d;
+    --night-600: #22394f;
+    --rain: rgba(174, 206, 235, 0.16);
+    --text: #eef3f8;
+    --text-muted: #a9bccd;      /* 7.9:1 on --night-800 */
+    --accent: #f2b23a;          /* warm lamp light; dark text on it */
+    --accent-dark: #d9961c;
+    --on-accent: #1c1405;
+    --line: rgba(255, 255, 255, 0.12);
+
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 22px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+
+    --font-display: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+    --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --touch: 56px;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+}
+
+body {
+    min-height: 100vh;
+    background: radial-gradient(ellipse at top, var(--night-700), var(--night-900) 70%);
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    /* stop phones from zooming/scrolling while you hold the buttons */
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Falling rain behind everything (turned off for people who prefer less motion) */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image: repeating-linear-gradient(105deg, transparent 0 22px, var(--rain) 22px 23px, transparent 23px 46px);
+    background-size: 46px 160px;
+    animation: rain 0.6s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes rain {
+    to { background-position: -24px 160px; }
+}
+
+button {
+    font: inherit;
+}
+
+:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+/* ---- Layout ---- */
+.shell {
+    width: min(100%, 980px);
+    margin: 0 auto;
+    padding: var(--space-3) var(--space-3) var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+/* ---- Top bar ---- */
+.hud {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 48px;
+}
+
+.hud-title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--accent);
+}
+
+.hud-level {
+    margin: 0;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.icon-btn {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-left: auto;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--night-700);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.icon-btn:hover {
+    background: var(--night-600);
+}
+
+/* ---- Game stage: the canvas plus overlays on top ---- */
+.stage {
+    position: relative;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--night-900);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--line);
+}
+
+#game {
+    display: block;
+    width: 100%;
+    height: auto;
+    touch-action: none;
+}
+
+.overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: var(--space-4);
+    background: rgba(8, 16, 25, 0.82);
+    overflow-y: auto;
+}
+
+.panel {
+    width: min(100%, 460px);
+    padding: var(--space-5);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--night-800);
+    text-align: center;
+}
+
+.panel h2 {
+    margin: 0 0 var(--space-4);
+    font-family: var(--font-display);
+}
+
+.eyebrow {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.game-title {
+    margin: 0 !important;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(3rem, 12vw, 4.5rem);
+    line-height: 1;
+    color: var(--accent);
+    text-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+
+.lead {
+    margin: var(--space-3) 0 var(--space-5);
+    color: var(--text-muted);
+}
+
+.how {
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+    text-align: left;
+}
+
+.how h3 {
+    margin: 0 0 var(--space-2);
+    font-size: 1rem;
+}
+
+.how ul {
+    margin: 0;
+    padding-left: 1.1rem;
+    color: var(--text-muted);
+}
+
+.key-hint {
+    color: var(--text);
+    font-weight: 700;
+}
+
+/* ---- Buttons ---- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 52px;
+    padding: 0 var(--space-6);
+    border: 0;
+    border-radius: 999px;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: transform 150ms ease, background-color 150ms ease;
+}
+
+.btn:active {
+    transform: translateY(2px);
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: 0 4px 0 var(--accent-dark);
+}
+
+.btn-primary:hover {
+    background: #f7c05a;
+}
+
+/* ---- Phone controls (shown on touch screens) ---- */
+.controls {
+    display: none;
+    justify-content: center;
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (pointer: coarse) {
+    .controls {
+        display: flex;
+    }
+}
+
+.dpad {
+    display: grid;
+    grid-template-columns: repeat(3, var(--touch));
+    grid-template-rows: repeat(3, var(--touch));
+    gap: var(--space-1);
+}
+
+.dpad-btn {
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--night-700);
+    color: var(--text);
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
+}
+
+.dpad-btn svg {
+    width: 28px;
+    height: 28px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* pressed (finger down) */
+.dpad-btn.is-down {
+    background: var(--accent);
+    color: var(--on-accent);
+}
+
+.dpad .up    { grid-area: 1 / 2; }
+.dpad .left  { grid-area: 2 / 1; }
+.dpad .right { grid-area: 2 / 3; }
+.dpad .down  { grid-area: 3 / 2; }
+
+.credits {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* Less motion: stop the rain and button nudges */
+@media (prefers-reduced-motion: reduce) {
+    body::before {
+        animation: none;
+    }
+
+    .btn {
+        transition: none;
+    }
+
+    .btn:active {
+        transform: none;
+    }
+}

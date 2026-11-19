@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0f1d2b">
+    <meta name="description" content="Baha! A flood survival game: save your family, pets and belongings before the water rises.">
+    <title>Baha! · Flood survival game</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <main class="shell">
+        <!-- TOP BAR: level name, and (from step 3) the timer and PAGASA warning -->
+        <header class="hud">
+            <h1 class="hud-title">Baha!</h1>
+            <p class="hud-level" id="hud-level">Two-Storey House</p>
+            <button type="button" class="icon-btn" id="pause-btn" aria-label="Pause game" hidden>
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M8 5v14M16 5v14" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg>
+            </button>
+        </header>
+
+        <!-- THE GAME: the canvas draws the house; overlays sit on top of it -->
+        <div class="stage">
+            <canvas id="game" aria-label="Top-down view of the house" role="img"></canvas>
+
+            <!-- Title screen -->
+            <section class="overlay" id="title-screen" aria-labelledby="title-heading">
+                <div class="panel">
+                    <p class="eyebrow">Flood survival game</p>
+                    <h2 class="game-title" id="title-heading">Baha!</h2>
+                    <p class="lead">A typhoon is coming and the water is rising. Carry your family, pets and
+                        important things up the stairs before the ground floor floods.</p>
+
+                    <button type="button" class="btn btn-primary" id="start-btn">Start</button>
+
+                    <div class="how">
+                        <h3>How to play</h3>
+                        <ul>
+                            <li><span class="key-hint">Move:</span> arrow keys or WASD (on phones, the buttons below)</li>
+                            <li><span class="key-hint">Pause:</span> P or Esc</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Pause screen -->
+            <section class="overlay" id="pause-screen" aria-labelledby="pause-heading" hidden>
+                <div class="panel">
+                    <h2 id="pause-heading">Paused</h2>
+                    <button type="button" class="btn btn-primary" id="resume-btn">Resume</button>
+                </div>
+            </section>
+        </div>
+
+        <!-- PHONE CONTROLS: a direction pad (hold to move) -->
+        <div class="controls" aria-label="Touch controls">
+            <div class="dpad">
+                <button type="button" class="dpad-btn up" data-dir="up" aria-label="Move up">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>
+                </button>
+                <button type="button" class="dpad-btn left" data-dir="left" aria-label="Move left">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+                </button>
+                <button type="button" class="dpad-btn right" data-dir="right" aria-label="Move right">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+                </button>
+                <button type="button" class="dpad-btn down" data-dir="down" aria-label="Move down">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+                </button>
+            </div>
+        </div>
+
+        <footer class="credits">
+            Made with HTML, CSS and JavaScript. Water levels follow PAGASA's rainfall warning colors.
+        </footer>
+    </main>
+
+    <!-- Plain scripts (no modules), so the game also runs by double-clicking index.html -->
+    <script src="js/levels.js"></script>
+    <script src="js/game.js"></script>
+</body>
+
+</html>
